@@ -124,7 +124,7 @@ fun ResumenPestana(vm: AppVM, libro: Libro) {
                 }
                 Text(
                     (if (m.esPago) "+ " else "- ") + soles(m.monto),
-                    style = MaterialTheme.typography.titleSmall.copy(fontFeatureSettings = "tnum"),
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = if (m.esPago) c.primary else c.onSurface,
                 )

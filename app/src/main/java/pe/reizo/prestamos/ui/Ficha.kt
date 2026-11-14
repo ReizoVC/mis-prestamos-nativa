@@ -8,12 +8,15 @@ import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.StickyNote2
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,20 +28,35 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import pe.reizo.prestamos.core.Cliente
 import pe.reizo.prestamos.core.Libro
 import pe.reizo.prestamos.core.Pago
 import pe.reizo.prestamos.core.Prestamo
 import pe.reizo.prestamos.core.celularBonito
+import pe.reizo.prestamos.core.dia
 import pe.reizo.prestamos.core.diasEntre
+import pe.reizo.prestamos.core.errorCelular
+import pe.reizo.prestamos.core.errorDni
+import pe.reizo.prestamos.core.errorDniRepetido
+import pe.reizo.prestamos.core.errorNombre
 import pe.reizo.prestamos.core.errorPago
 import pe.reizo.prestamos.core.fechaCorta
+import pe.reizo.prestamos.core.fechaLarga
 import pe.reizo.prestamos.core.haceDias
+import pe.reizo.prestamos.core.inicioDia
+import pe.reizo.prestamos.core.mensajeWhatsapp
 import pe.reizo.prestamos.core.montoParaCampo
 import pe.reizo.prestamos.core.parseMonto
 import pe.reizo.prestamos.core.primerNombre
 import pe.reizo.prestamos.core.soles
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 private fun abrirEnlace(ctx: Context, accion: String, enlace: String) {
     // Si el celular no tiene con qué abrirlo (por ejemplo, sin WhatsApp), no pasa nada
@@ -54,10 +72,22 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
     var corrigiendo by remember { mutableStateOf<Pago?>(null) }
     var borrando by remember { mutableStateOf<Pago?>(null) }
     var eliminando by remember { mutableStateOf(false) }
+    var editando by remember { mutableStateOf(false) }
+    var notaDe by remember { mutableStateOf<Prestamo?>(null) }
     val ambito = rememberCoroutineScope()
 
     Scaffold(
-        topBar = { BarraInterna("Cliente", vm::volver) },
+        topBar = {
+            BarraInterna("Cliente", vm::volver) {
+                if (cliente != null) {
+                    TextButton(onClick = { editando = true }, modifier = Modifier.heightIn(min = ALTO_BOTON)) {
+                        Icon(Icons.Default.Edit, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Editar")
+                    }
+                }
+            }
+        },
         snackbarHost = { SnackbarHost(avisos) },
     ) { margen ->
         if (cliente == null) return@Scaffold
@@ -86,7 +116,11 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
                         Text("Llamar")
                     }
                     Button(
-                        onClick = { abrirEnlace(ctx, Intent.ACTION_VIEW, "https://wa.me/51${cliente.celular}") },
+                        onClick = {
+                            // Abre el chat con el mensaje ya escrito; ella decide si lo envía o lo cambia
+                            val texto = Uri.encode(mensajeWhatsapp(cliente.nombre, libro.deuda(clienteId)))
+                            abrirEnlace(ctx, Intent.ACTION_VIEW, "https://wa.me/51${cliente.celular}?text=$texto")
+                        },
                         modifier = Modifier.weight(1f).height(ALTO_BOTON),
                         colors = ButtonDefaults.buttonColors(containerColor = VerdeWhatsapp, contentColor = Color.White),
                     ) {
@@ -97,7 +131,12 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
                 }
 
                 activos.forEach { p ->
-                    PrestamoActivo(libro, p, vm.ahora, alPagar = { pagoPara = p }, alTocarPago = { pagoElegido = it })
+                    PrestamoActivo(
+                        libro, p, vm.ahora,
+                        alPagar = { pagoPara = p },
+                        alTocarPago = { pagoElegido = it },
+                        alTocarNota = { notaDe = p },
+                    )
                 }
 
                 if (activos.isEmpty()) {
@@ -139,11 +178,13 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
             subtitulo = "$nombre · le falta ${soles(libro.falta(p))}",
             maximo = libro.falta(p),
             inicial = "",
+            ahora = vm.ahora,
+            fechaMinima = p.creadoEn,
             alCerrar = { pagoPara = null },
-            alGuardar = { monto ->
+            alGuardar = { monto, fecha ->
                 pagoPara = null
                 ambito.launch {
-                    val termino = vm.repo.registrarPago(p.id, monto)
+                    val termino = vm.repo.registrarPago(p.id, monto, fecha)
                     val quedanOtros = libro.activosDe(clienteId).any { it.id != p.id }
                     vm.avisar(
                         when {
@@ -192,8 +233,10 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
                 subtitulo = "Pago del ${fechaCorta(pago.fecha, vm.ahora)}. Antes decía ${soles(pago.monto)}.",
                 maximo = maximo,
                 inicial = montoParaCampo(pago.monto),
+                ahora = vm.ahora,
+                fechaMinima = null,
                 alCerrar = { corrigiendo = null },
-                alGuardar = { monto ->
+                alGuardar = { monto, _ ->
                     corrigiendo = null
                     ambito.launch {
                         vm.repo.corregirPago(pago.id, monto)
@@ -227,7 +270,8 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
             text = {
                 Text(
                     (if (deuda > 0) "Todavía le debe ${soles(deuda)}. " else "") +
-                        "Se quitarán sus préstamos y pagos, y dejarán de contarse en el resumen.",
+                        "Se quitarán sus préstamos y pagos, y dejarán de contarse en el resumen. " +
+                        "Podrá recuperarlo desde Ajustes.",
                 )
             },
             confirmButton = {
@@ -238,15 +282,62 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
             dismissButton = { TextButton(onClick = { eliminando = false }) { Text("No") } },
         )
     }
+
+    if (editando && cliente != null) {
+        HojaEditarCliente(
+            cliente, libro,
+            alCerrar = { editando = false },
+            alGuardar = { nombre, celular, dni ->
+                editando = false
+                ambito.launch {
+                    vm.repo.editarCliente(cliente.id, nombre, celular, dni)
+                    vm.avisar("Datos guardados")
+                }
+            },
+        )
+    }
+
+    notaDe?.let { p ->
+        var texto by remember(p.id) { mutableStateOf(p.nota) }
+        AlertDialog(
+            onDismissRequest = { notaDe = null },
+            title = { Text("Nota del préstamo") },
+            text = {
+                OutlinedTextField(
+                    value = texto,
+                    onValueChange = { texto = it.take(120) },
+                    placeholder = { Text("Ej.: paga los sábados") },
+                    minLines = 2,
+                    maxLines = 4,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    notaDe = null
+                    ambito.launch { vm.repo.cambiarNota(p.id, texto) }
+                }) { Text("Guardar") }
+            },
+            dismissButton = { TextButton(onClick = { notaDe = null }) { Text("Cancelar") } },
+        )
+    }
 }
 
 @Composable
-private fun PrestamoActivo(libro: Libro, p: Prestamo, ahora: Long, alPagar: () -> Unit, alTocarPago: (Pago) -> Unit) {
+private fun PrestamoActivo(
+    libro: Libro,
+    p: Prestamo,
+    ahora: Long,
+    alPagar: () -> Unit,
+    alTocarPago: (Pago) -> Unit,
+    alTocarNota: () -> Unit,
+) {
     val pagado = libro.pagado(p)
     val falta = libro.falta(p)
     val pagos = libro.pagosDe(p.id)
     Tarjeta {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("Préstamo del ${fechaCorta(p.creadoEn, ahora)}", style = MaterialTheme.typography.titleMedium)
             LinearProgressIndicator(
                 progress = { if (p.montoAPagar > 0) pagado.toFloat() / p.montoAPagar else 0f },
@@ -266,6 +357,21 @@ private fun PrestamoActivo(libro: Libro, p: Prestamo, ahora: Long, alPagar: () -
                 }
             }
             Button(onClick = alPagar, modifier = Modifier.fillMaxWidth().height(60.dp)) { Text("Registrar pago") }
+        }
+        // Nota: se toca para escribirla o cambiarla
+        Row(
+            Modifier.fillMaxWidth().clickable(onClickLabel = "Cambiar nota", onClick = alTocarNota)
+                .heightIn(min = ALTO_BOTON).padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(Icons.AutoMirrored.Filled.StickyNote2, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                p.nota.ifBlank { "Agregar una nota" },
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (p.nota.isBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            )
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerHigh)
         Column(Modifier.padding(top = 14.dp, bottom = 8.dp)) {
@@ -288,7 +394,7 @@ private fun PrestamoActivo(libro: Libro, p: Prestamo, ahora: Long, alPagar: () -
                         Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyLarge,
                     )
-                    Text(soles(pago.monto), style = MaterialTheme.typography.titleSmall.copy(fontFeatureSettings = "tnum"), fontWeight = FontWeight.Bold)
+                    Text(soles(pago.monto), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -299,22 +405,29 @@ private fun PrestamoActivo(libro: Libro, p: Prestamo, ahora: Long, alPagar: () -
 private fun Dato(nombre: String, valor: String, modifier: Modifier = Modifier) {
     Column(modifier) {
         Text(nombre, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(valor, style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"))
+        Text(valor, style = MaterialTheme.typography.titleMedium)
     }
 }
 
-/** Hoja desde abajo para escribir un monto de pago (nuevo o corregido). */
+/**
+ * Hoja desde abajo para escribir un monto de pago (nuevo o corregido).
+ * Con `fechaMinima` deja elegir el día del pago (entre el día del préstamo y hoy).
+ */
 @Composable
 private fun HojaPago(
     titulo: String,
     subtitulo: String,
     maximo: Long,
     inicial: String,
+    ahora: Long,
+    fechaMinima: Long?,
     alCerrar: () -> Unit,
-    alGuardar: (Long) -> Unit,
+    alGuardar: (monto: Long, fecha: Long?) -> Unit,
 ) {
     var texto by remember { mutableStateOf(inicial) }
     var error by remember { mutableStateOf<String?>(null) }
+    var otroDia by remember { mutableStateOf<LocalDate?>(null) }   // null = hoy
+    var eligiendoDia by remember { mutableStateOf(false) }
     val foco = remember { FocusRequester() }
     val vibrar = LocalHapticFeedback.current
     val monto = parseMonto(texto)
@@ -346,6 +459,22 @@ private fun HojaPago(
                 rapido("Todo", maximo)
             }
 
+            if (fechaMinima != null) {
+                Row(
+                    Modifier.fillMaxWidth().clickable(onClickLabel = "Cambiar el día del pago") { eligiendoDia = true }.heightIn(min = ALTO_BOTON),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Icon(Icons.Default.Event, null, tint = c.onSurfaceVariant)
+                    Text(
+                        "Pagó " + (otroDia?.let { "el ${fechaLarga(it)}" } ?: "hoy"),
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text("Cambiar día", style = MaterialTheme.typography.labelLarge, color = c.primary)
+                }
+            }
+
             // Lo que pasará al guardar
             val (fondo, linea, cifra) = when {
                 monto != null && monto > maximo -> Triple(c.errorContainer, "Es más de lo que debe", "Máximo ${soles(maximo)}")
@@ -366,8 +495,93 @@ private fun HojaPago(
                         error = errorPago(monto, maximo)
                         if (error == null && monto != null) {
                             vibrar.performHapticFeedback(HapticFeedbackType.LongPress)
-                            alGuardar(monto)
+                            // Un día pasado se guarda al mediodía de ese día
+                            alGuardar(monto, otroDia?.let { inicioDia(it) + 12 * 3_600_000L })
                         }
+                    },
+                    modifier = Modifier.weight(1f).height(60.dp),
+                ) { Text("Guardar") }
+            }
+        }
+    }
+
+    if (eligiendoDia && fechaMinima != null) {
+        fun LocalDate.utc() = atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        val hoy = dia(ahora)
+        val desde = dia(fechaMinima)
+        val estado = rememberDatePickerState(
+            initialSelectedDateMillis = (otroDia ?: hoy).utc(),
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis in desde.utc()..hoy.utc()
+                override fun isSelectableYear(year: Int) = year in desde.year..hoy.year
+            },
+        )
+        DatePickerDialog(
+            onDismissRequest = { eligiendoDia = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val elegido = estado.selectedDateMillis?.let { Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate() }
+                    otroDia = elegido?.takeIf { it != hoy }
+                    eligiendoDia = false
+                }) { Text("Aceptar") }
+            },
+            dismissButton = { TextButton(onClick = { eligiendoDia = false }) { Text("Cancelar") } },
+        ) {
+            DatePicker(state = estado, title = { Text("¿Qué día pagó?", Modifier.padding(start = 24.dp, top = 16.dp)) }, showModeToggle = false)
+        }
+    }
+}
+
+/** Corregir nombre, celular o DNI de un cliente. */
+@Composable
+private fun HojaEditarCliente(
+    cliente: Cliente,
+    libro: Libro,
+    alCerrar: () -> Unit,
+    alGuardar: (nombre: String, celular: String, dni: String) -> Unit,
+) {
+    var nombre by remember { mutableStateOf(cliente.nombre) }
+    var celular by remember { mutableStateOf(cliente.celular) }
+    var dni by remember { mutableStateOf(cliente.dni) }
+    var errores by remember { mutableStateOf(List<String?>(3) { null }) }
+
+    ModalBottomSheet(onDismissRequest = alCerrar, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(
+            Modifier.padding(start = 24.dp, end = 24.dp, bottom = 24.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Editar datos", style = MaterialTheme.typography.headlineSmall)
+            OutlinedTextField(
+                value = nombre, onValueChange = { nombre = it.take(60) },
+                label = { Text("Nombre") }, singleLine = true,
+                isError = errores[0] != null, supportingText = errores[0]?.let { { Text(it) } },
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = celular, onValueChange = { celular = it.filter(Char::isDigit).take(9) },
+                label = { Text("Celular") }, singleLine = true,
+                isError = errores[1] != null, supportingText = errores[1]?.let { { Text(it) } },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = dni, onValueChange = { dni = it.filter(Char::isDigit).take(8) },
+                label = { Text("DNI") }, singleLine = true,
+                isError = errores[2] != null, supportingText = errores[2]?.let { { Text(it) } },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                FilledTonalButton(onClick = alCerrar, modifier = Modifier.weight(1f).height(60.dp)) { Text("Cancelar") }
+                Button(
+                    onClick = {
+                        errores = listOf(
+                            errorNombre(nombre),
+                            errorCelular(celular),
+                            errorDni(dni) ?: errorDniRepetido(dni, cliente.id, libro.clientes),
+                        )
+                        if (errores.all { it == null }) alGuardar(nombre, celular, dni)
                     },
                     modifier = Modifier.weight(1f).height(60.dp),
                 ) { Text("Guardar") }

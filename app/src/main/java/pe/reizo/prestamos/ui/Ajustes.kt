@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Restore
@@ -31,7 +32,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import pe.reizo.prestamos.BuildConfig
+import pe.reizo.prestamos.core.Libro
 import pe.reizo.prestamos.core.dia
+import pe.reizo.prestamos.core.fechaCorta
 import pe.reizo.prestamos.data.EstadoNube
 
 private fun haceRato(desde: Long, ahora: Long): String {
@@ -47,7 +50,7 @@ private fun haceRato(desde: Long, ahora: Long): String {
 }
 
 @Composable
-fun Ajustes(vm: AppVM, avisos: SnackbarHostState) {
+fun Ajustes(vm: AppVM, libro: Libro, avisos: SnackbarHostState) {
     val ctx = LocalContext.current
     val ambito = rememberCoroutineScope()
     val estado by vm.nube.estado.collectAsStateWithLifecycle()
@@ -160,6 +163,19 @@ fun Ajustes(vm: AppVM, avisos: SnackbarHostState) {
                     )
                 }
 
+                Tarjeta {
+                    val n = libro.eliminados.size
+                    Fila(
+                        Icons.Default.DeleteOutline, "Clientes eliminados",
+                        when (n) {
+                            0 -> "No hay ninguno."
+                            1 -> "Hay 1. Toque para recuperarlo."
+                            else -> "Hay $n. Toque para recuperar alguno."
+                        },
+                        alTocar = if (n > 0) ({ vm.abrir(Pantalla.Papelera) }) else null,
+                    )
+                }
+
                 if (vm.nube.configurada) {
                     Tarjeta {
                         Fila(Icons.AutoMirrored.Filled.Logout, "Cerrar sesión", alTocar = {
@@ -228,4 +244,42 @@ private fun Fila(
             .heightIn(min = 64.dp)
             .padding(vertical = 4.dp),
     )
+}
+
+/** Clientes eliminados. Se pueden recuperar con sus préstamos y pagos. */
+@Composable
+fun Papelera(vm: AppVM, libro: Libro, avisos: SnackbarHostState) {
+    val eliminados = libro.eliminados
+    Scaffold(
+        topBar = { BarraInterna("Clientes eliminados", vm::volver) },
+        snackbarHost = { SnackbarHost(avisos) },
+    ) { margen ->
+        Box(Modifier.padding(margen).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            Column(
+                Modifier.widthIn(max = 600.dp).verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                if (eliminados.isEmpty()) Vacio("No hay clientes eliminados.")
+                eliminados.forEachIndexed { i, c ->
+                    Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest, shape = formaEnGrupo(i, eliminados.size)) {
+                        Row(
+                            Modifier.fillMaxWidth().heightIn(min = 76.dp).padding(start = 16.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(c.nombre, style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    "Se eliminó el ${fechaCorta(c.actualizadoEn, vm.ahora)}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            FilledTonalButton(onClick = { vm.recuperarCliente(c) }, modifier = Modifier.height(ALTO_BOTON)) { Text("Recuperar") }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

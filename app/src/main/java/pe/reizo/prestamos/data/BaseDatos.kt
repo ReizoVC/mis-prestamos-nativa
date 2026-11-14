@@ -7,6 +7,8 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Upsert
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 import pe.reizo.prestamos.core.Cliente
 import pe.reizo.prestamos.core.Pago
@@ -39,6 +41,10 @@ interface Tablas {
     @Query("SELECT * FROM prestamos WHERE clienteId = :clienteId AND borrado = 0")
     suspend fun prestamosVigentes(clienteId: String): List<Prestamo>
 
+    // Incluyen las filas borradas (para recuperar a un cliente eliminado)
+    @Query("SELECT * FROM prestamos WHERE clienteId = :clienteId") suspend fun prestamosDe(clienteId: String): List<Prestamo>
+    @Query("SELECT * FROM pagos WHERE prestamoId = :prestamoId") suspend fun pagosDe(prestamoId: String): List<Pago>
+
     @Upsert suspend fun guardar(c: Cliente)
     @Upsert suspend fun guardar(p: Prestamo)
     @Upsert suspend fun guardar(p: Pago)
@@ -58,7 +64,7 @@ interface Tablas {
 }
 
 // Para cambiar el esquema: subir `version` y agregar una Migration. Nunca borrar la base para migrar.
-@Database(entities = [Cliente::class, Prestamo::class, Pago::class], version = 1, exportSchema = false)
+@Database(entities = [Cliente::class, Prestamo::class, Pago::class], version = 2, exportSchema = false)
 abstract class BaseDatos : RoomDatabase() {
     abstract fun tablas(): Tablas
 
@@ -66,6 +72,15 @@ abstract class BaseDatos : RoomDatabase() {
         /** Con `enMemoria` nada se escribe en el celular: la base desaparece al cerrar la app. */
         fun abrir(ctx: Context, enMemoria: Boolean): BaseDatos =
             if (enMemoria) Room.inMemoryDatabaseBuilder(ctx.applicationContext, BaseDatos::class.java).build()
-            else Room.databaseBuilder(ctx.applicationContext, BaseDatos::class.java, "prestamos.db").build()
+            else Room.databaseBuilder(ctx.applicationContext, BaseDatos::class.java, "prestamos.db")
+                .addMigrations(V1_A_V2)
+                .build()
+
+        /** Versión 2: nota en cada préstamo. */
+        private val V1_A_V2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE prestamos ADD COLUMN nota TEXT NOT NULL DEFAULT ''")
+            }
+        }
     }
 }

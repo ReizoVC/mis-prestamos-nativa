@@ -1,5 +1,6 @@
 package pe.reizo.prestamos.core
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -31,6 +32,7 @@ data class Prestamo(
     val actualizadoEn: Long,
     val borrado: Boolean = false,
     val pendiente: Boolean = true,
+    @ColumnInfo(defaultValue = "") val nota: String = "",   // apunte libre: "paga los sábados"
 )
 
 @Entity(tableName = "pagos", indices = [Index("prestamoId")])

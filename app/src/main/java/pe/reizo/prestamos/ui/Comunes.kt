@@ -44,7 +44,7 @@ fun formaEnGrupo(posicion: Int, total: Int): RoundedCornerShape {
 }
 
 @Composable
-fun BarraInterna(titulo: String, volver: () -> Unit) {
+fun BarraInterna(titulo: String, volver: () -> Unit, acciones: @Composable RowScope.() -> Unit = {}) {
     TopAppBar(
         title = { Text(titulo, style = MaterialTheme.typography.titleLarge) },
         navigationIcon = {
@@ -52,6 +52,7 @@ fun BarraInterna(titulo: String, volver: () -> Unit) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
             }
         },
+        actions = acciones,
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
     )
 }
@@ -151,7 +152,7 @@ fun FilaDato(izquierda: String, derecha: String, modifier: Modifier = Modifier, 
         Text(izquierda, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
         Text(
             derecha,
-            style = MaterialTheme.typography.titleSmall.copy(fontFeatureSettings = "tnum"),
+            style = MaterialTheme.typography.titleSmall,
             color = colorDerecha,
             fontWeight = if (negrita) FontWeight.Bold else FontWeight.SemiBold,
         )
@@ -193,6 +194,7 @@ fun PrestamoPlegable(libro: Libro, p: Prestamo, ahora: Long) {
                     (p.pagadoEn?.let { "pagaba ${soles(p.montoAPagar)}. Terminó el ${fechaCorta(it, ahora)}." }
                         ?: "paga ${soles(p.montoAPagar)}.")
                 Text(historia, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (p.nota.isNotBlank()) Text("Nota: ${p.nota}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
                 val pagos = libro.pagosDe(p.id)
                 if (pagos.isEmpty()) Text("Todavía no hizo pagos.", style = MaterialTheme.typography.bodyMedium)

@@ -97,6 +97,16 @@ cada 2 minutos y después de cada cambio.
 
 **Pendiente de probar:** la sincronización está escrita pero no se ha probado contra un proyecto Supabase real.
 
+## Cambio en la nube desde la versión 1.0.1
+
+Los préstamos ahora tienen una nota. Antes de activar la nube, ejecutar en el editor SQL de Supabase:
+
+```sql
+alter table public.prestamos add column if not exists nota text not null default '';
+```
+
+La tipografía es Atkinson Hyperlegible (Braille Institute, licencia SIL Open Font License), incluida en `app/src/main/res/font`.
+
 ## Estructura
 
 ```

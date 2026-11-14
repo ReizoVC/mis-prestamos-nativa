@@ -43,6 +43,7 @@ fun NuevoPrestamo(vm: AppVM, libro: Libro, clienteInicial: String?, avisos: Snac
     var dni by rememberSaveable { mutableStateOf(inicial?.dni ?: "") }
     var prestado by rememberSaveable { mutableStateOf("") }
     var aPagar by rememberSaveable { mutableStateOf("") }
+    var nota by rememberSaveable { mutableStateOf("") }
     var errores by remember { mutableStateOf(List<String?>(5) { null }) }
     var guardando by remember { mutableStateOf(false) }
     val focos = remember { List(5) { FocusRequester() } }
@@ -71,7 +72,7 @@ fun NuevoPrestamo(vm: AppVM, libro: Libro, clienteInicial: String?, avisos: Snac
         }
         guardando = true
         ambito.launch {
-            val id = vm.repo.crearPrestamo(elegido?.id, nombre, celular, dni, mp!!, ma!!)
+            val id = vm.repo.crearPrestamo(elegido?.id, nombre, celular, dni, mp!!, ma!!, nota)
             vm.avisar("Préstamo de ${soles(mp)} guardado")
             vm.irAFicha(id)
         }
@@ -183,7 +184,16 @@ fun NuevoPrestamo(vm: AppVM, libro: Libro, clienteInicial: String?, avisos: Snac
                     modifier = Modifier.fillMaxWidth().focusRequester(focos[2]),
                 )
                 CampoMonto(prestado, { prestado = it; sinError(3) }, "¿Cuánto le prestó?", Modifier.focusRequester(focos[3]), error = errores[3])
-                CampoMonto(aPagar, { aPagar = it; sinError(4) }, "¿Cuánto le va a pagar?", Modifier.focusRequester(focos[4]), error = errores[4], ultimo = true)
+                CampoMonto(aPagar, { aPagar = it; sinError(4) }, "¿Cuánto le va a pagar?", Modifier.focusRequester(focos[4]), error = errores[4])
+                OutlinedTextField(
+                    value = nota,
+                    onValueChange = { nota = it.take(120) },
+                    label = { Text("Nota (si quiere)") },
+                    placeholder = { Text("Ej.: paga los sábados") },
+                    maxLines = 3,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                    modifier = Modifier.fillMaxWidth(),
+                )
 
                 val mp = parseMonto(prestado)
                 val ma = parseMonto(aPagar)

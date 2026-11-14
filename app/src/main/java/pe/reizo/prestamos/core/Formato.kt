@@ -82,3 +82,8 @@ fun primerNombre(nombre: String): String = nombre.trim().substringBefore(' ')
 /** Sin tildes y en minúsculas, para buscar. */
 fun normalizar(s: String): String =
     Normalizer.normalize(s.trim().lowercase(), Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
+
+/** Mensaje que se deja escrito al abrir WhatsApp. Ella puede cambiarlo antes de enviar. */
+fun mensajeWhatsapp(nombre: String, deuda: Long): String =
+    if (deuda > 0) "Hola ${primerNombre(nombre)}, le escribo por el préstamo. A la fecha le falta pagar ${soles(deuda)}."
+    else "Hola ${primerNombre(nombre)}"

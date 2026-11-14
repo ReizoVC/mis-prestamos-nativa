@@ -9,7 +9,10 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import pe.reizo.prestamos.R
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -21,7 +24,8 @@ private val Claro = lightColorScheme(
     primaryContainer = Color(0xFFDCF0E2), onPrimaryContainer = Color(0xFF0B3D27),
     secondary = Color(0xFF4A6355), onSecondary = Color.White,
     secondaryContainer = Color(0xFFDCE8DF), onSecondaryContainer = Color(0xFF1A2B22),
-    tertiary = Color(0xFF3B6470), onTertiary = Color.White,
+    tertiary = Color(0xFF6B5300), onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFFFE9B0), onTertiaryContainer = Color(0xFF3D2E00),
     error = Color(0xFFB3261E), onError = Color.White,
     errorContainer = Color(0xFFFBE6E4), onErrorContainer = Color(0xFF8C1D18),
     background = Color(0xFFF7F8F5), onBackground = Color(0xFF1A1F1C),
@@ -39,7 +43,8 @@ private val Oscuro = darkColorScheme(
     primaryContainer = Color(0xFF0F5236), onPrimaryContainer = Color(0xFFC9F0D7),
     secondary = Color(0xFFB4CCBB), onSecondary = Color(0xFF203529),
     secondaryContainer = Color(0xFF33473B), onSecondaryContainer = Color(0xFFD5E5D9),
-    tertiary = Color(0xFFA3CDDB), onTertiary = Color(0xFF033541),
+    tertiary = Color(0xFFE9C46A), onTertiary = Color(0xFF3D2E00),
+    tertiaryContainer = Color(0xFF574200), onTertiaryContainer = Color(0xFFFFE9B0),
     error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
     errorContainer = Color(0xFF5C1512), onErrorContainer = Color(0xFFFFDAD6),
     background = Color(0xFF111512), onBackground = Color(0xFFE1E4DE),
@@ -53,19 +58,34 @@ private val Oscuro = darkColorScheme(
 )
 
 // Letra grande: nada baja de 16. Los números usan cifras del mismo ancho para que las columnas cuadren.
-private val b = Typography()
-private const val TNUM = "tnum"
+// Atkinson Hyperlegible: hecha para leerse fácil con poca vista (licencia SIL OFL). Va dentro del APK.
+private val Atkinson = FontFamily(
+    Font(R.font.atkinson_regular, FontWeight.Normal),
+    Font(R.font.atkinson_bold, FontWeight.Bold),
+)
+private val b = Typography().let { t ->
+    Typography(
+        displayLarge = t.displayLarge.copy(fontFamily = Atkinson), displayMedium = t.displayMedium.copy(fontFamily = Atkinson),
+        displaySmall = t.displaySmall.copy(fontFamily = Atkinson), headlineLarge = t.headlineLarge.copy(fontFamily = Atkinson),
+        headlineMedium = t.headlineMedium.copy(fontFamily = Atkinson), headlineSmall = t.headlineSmall.copy(fontFamily = Atkinson),
+        titleLarge = t.titleLarge.copy(fontFamily = Atkinson), titleMedium = t.titleMedium.copy(fontFamily = Atkinson),
+        titleSmall = t.titleSmall.copy(fontFamily = Atkinson), bodyLarge = t.bodyLarge.copy(fontFamily = Atkinson),
+        bodyMedium = t.bodyMedium.copy(fontFamily = Atkinson), bodySmall = t.bodySmall.copy(fontFamily = Atkinson),
+        labelLarge = t.labelLarge.copy(fontFamily = Atkinson), labelMedium = t.labelMedium.copy(fontFamily = Atkinson),
+        labelSmall = t.labelSmall.copy(fontFamily = Atkinson),
+    )
+}
 private val Tipos = Typography(
-    displaySmall = b.displaySmall.copy(fontSize = 38.sp, lineHeight = 44.sp, fontWeight = FontWeight.Bold, fontFeatureSettings = TNUM),
+    displaySmall = b.displaySmall.copy(fontSize = 38.sp, lineHeight = 44.sp, fontWeight = FontWeight.Bold),
     headlineMedium = b.headlineMedium.copy(fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold),
-    headlineSmall = b.headlineSmall.copy(fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold, fontFeatureSettings = TNUM),
-    titleLarge = b.titleLarge.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, fontFeatureSettings = TNUM),
-    titleMedium = b.titleMedium.copy(fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold),
-    titleSmall = b.titleSmall.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
+    headlineSmall = b.headlineSmall.copy(fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold),
+    titleLarge = b.titleLarge.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold),
+    titleMedium = b.titleMedium.copy(fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold),
+    titleSmall = b.titleSmall.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold),
     bodyLarge = b.bodyLarge.copy(fontSize = 18.sp, lineHeight = 26.sp),
     bodyMedium = b.bodyMedium.copy(fontSize = 16.sp, lineHeight = 22.sp, letterSpacing = 0.sp),
     bodySmall = b.bodySmall.copy(fontSize = 16.sp, lineHeight = 22.sp, letterSpacing = 0.sp),
-    labelLarge = b.labelLarge.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
+    labelLarge = b.labelLarge.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold),
     labelMedium = b.labelMedium.copy(fontSize = 16.sp, lineHeight = 20.sp, letterSpacing = 0.sp),
     labelSmall = b.labelSmall.copy(fontSize = 16.sp, lineHeight = 20.sp, letterSpacing = 0.sp),
 )

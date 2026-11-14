@@ -39,6 +39,7 @@ fun Prestamo.aJson(iso: Boolean): JSONObject = JSONObject()
     .put("pagado_en", pagadoEn?.let { fechaJson(it, iso) } ?: JSONObject.NULL)
     .put("actualizado_en", fechaJson(actualizadoEn, iso))
     .put("borrado", borrado)
+    .put("nota", nota)
 
 fun Pago.aJson(iso: Boolean): JSONObject = JSONObject()
     .put("id", id).put("prestamo_id", prestamoId)
@@ -56,6 +57,7 @@ fun prestamoDe(o: JSONObject): Prestamo = Prestamo(
     montoPrestado = o.centimos("monto_prestado"), montoAPagar = o.centimos("monto_a_pagar"),
     creadoEn = o.fecha("creado_en"), pagadoEn = if (o.isNull("pagado_en")) null else o.fecha("pagado_en"),
     actualizadoEn = o.fecha("actualizado_en"), borrado = o.borrado(),
+    nota = if (o.isNull("nota")) "" else o.optString("nota"),
 )
 
 fun pagoDe(o: JSONObject): Pago = Pago(

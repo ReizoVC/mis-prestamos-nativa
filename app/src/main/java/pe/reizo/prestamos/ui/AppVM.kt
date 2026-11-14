@@ -39,6 +39,7 @@ sealed interface Pantalla {
     data class Nuevo(val clienteId: String?) : Pantalla
     data object Ganancia : Pantalla
     data object Ajustes : Pantalla
+    data object Papelera : Pantalla
 }
 
 /** Aviso corto abajo. Puede traer un botón (por ejemplo "Deshacer"). */
@@ -89,8 +90,8 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     fun eliminarCliente(c: Cliente) {
         volver()
         viewModelScope.launch {
-            val eliminado = repo.eliminarCliente(c.id)
-            avisar("Se eliminó a ${c.nombre}", "Deshacer") { repo.restaurarCliente(eliminado) }
+            repo.eliminarCliente(c.id)
+            avisar("Se eliminó a ${c.nombre}", "Deshacer") { repo.restaurarCliente(c.id) }
         }
     }
 
@@ -99,6 +100,10 @@ class AppVM(app: Application) : AndroidViewModel(app) {
             repo.borrarPago(pagoId)
             avisar("Pago borrado", "Deshacer") { repo.restaurarPago(pagoId) }
         }
+    }
+
+    fun recuperarCliente(c: Cliente) {
+        viewModelScope.launch { repo.restaurarCliente(c.id); avisar("Se recuperó a ${c.nombre}") }
     }
 
     fun reiniciarEjemplo() {

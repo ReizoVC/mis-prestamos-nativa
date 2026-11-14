@@ -34,6 +34,8 @@ fun pagadoEnSegun(p: Prestamo, pagosVigentes: List<Pago>): Long? {
 /** Foto de todos los datos. Todas las cuentas de la app salen de aquí. */
 class Libro(clientes: List<Cliente>, prestamos: List<Prestamo>, pagos: List<Pago>) {
     val clientes: List<Cliente> = clientes.filter { !it.borrado }
+    /** Clientes eliminados (papelera), el más reciente primero. */
+    val eliminados: List<Cliente> = clientes.filter { it.borrado }.sortedByDescending { it.actualizadoEn }
     val prestamos: List<Prestamo> = prestamos.filter { !it.borrado }
     val pagos: List<Pago> = pagos.filter { !it.borrado }
 

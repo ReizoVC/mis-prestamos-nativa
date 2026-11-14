@@ -18,7 +18,7 @@ class Repo(private val db: BaseDatos, private val alCambiar: () -> Unit) {
 
     /** Crea el préstamo (y el cliente si es nuevo). Devuelve el id del cliente. */
     suspend fun crearPrestamo(
-        clienteId: String?, nombre: String, celular: String, dni: String, prestado: Long, aPagar: Long,
+        clienteId: String?, nombre: String, celular: String, dni: String, prestado: Long, aPagar: Long, nota: String = "",
     ): String {
         val ahora = System.currentTimeMillis()
         val id = db.withTransaction {
@@ -29,18 +29,18 @@ class Repo(private val db: BaseDatos, private val alCambiar: () -> Unit) {
             } else if (existente.celular != celular || existente.dni != dni) {
                 t.guardar(existente.copy(celular = celular, dni = dni, actualizadoEn = ahora, pendiente = true))
             }
-            t.guardar(Prestamo(nuevoId(), cid, prestado, aPagar, ahora, null, ahora))
+            t.guardar(Prestamo(nuevoId(), cid, prestado, aPagar, ahora, null, ahora, nota = nota.trim()))
             cid
         }
         alCambiar()
         return id
     }
 
-    /** Devuelve true si con este pago terminó de pagar el préstamo. */
-    suspend fun registrarPago(prestamoId: String, monto: Long): Boolean {
+    /** Devuelve true si con este pago terminó de pagar el préstamo. `fecha` null = ahora. */
+    suspend fun registrarPago(prestamoId: String, monto: Long, fecha: Long? = null): Boolean {
         val ahora = System.currentTimeMillis()
         val termino = db.withTransaction {
-            t.guardar(Pago(nuevoId(), prestamoId, monto, ahora, ahora))
+            t.guardar(Pago(nuevoId(), prestamoId, monto, fecha ?: ahora, ahora))
             recalcular(prestamoId, ahora)
         }
         alCambiar()
@@ -51,27 +51,51 @@ class Repo(private val db: BaseDatos, private val alCambiar: () -> Unit) {
     suspend fun borrarPago(pagoId: String) = cambiarPago(pagoId) { it.copy(borrado = true) }
     suspend fun restaurarPago(pagoId: String) = cambiarPago(pagoId) { it.copy(borrado = false) }
 
-    /** Lo que se marcó como borrado al eliminar un cliente, para poder deshacerlo. */
-    class Eliminado(val clienteId: String, val prestamos: List<String>, val pagos: List<String>)
-
-    /** Elimina al cliente con sus préstamos y pagos. Nada se borra de verdad: quedan marcados como borrados. */
-    suspend fun eliminarCliente(clienteId: String): Eliminado = marcarCliente(clienteId, null)
-
-    suspend fun restaurarCliente(e: Eliminado) { marcarCliente(e.clienteId, e) }
-
-    private suspend fun marcarCliente(clienteId: String, deshacer: Eliminado?): Eliminado {
+    /** Elimina al cliente con sus préstamos y pagos. Nada se borra de verdad: quedan marcados y se pueden recuperar. */
+    suspend fun eliminarCliente(clienteId: String) {
         val ahora = System.currentTimeMillis()
-        val borrar = deshacer == null
-        val hecho = db.withTransaction {
-            val prestamos = deshacer?.prestamos?.mapNotNull { t.prestamo(it) } ?: t.prestamosVigentes(clienteId)
-            val pagos = deshacer?.pagos?.mapNotNull { t.pago(it) } ?: prestamos.flatMap { t.pagosVigentes(it.id) }
-            t.cliente(clienteId)?.let { t.guardar(it.copy(borrado = borrar, actualizadoEn = ahora, pendiente = true)) }
-            prestamos.forEach { t.guardar(it.copy(borrado = borrar, actualizadoEn = ahora, pendiente = true)) }
-            pagos.forEach { t.guardar(it.copy(borrado = borrar, actualizadoEn = ahora, pendiente = true)) }
-            Eliminado(clienteId, prestamos.map { it.id }, pagos.map { it.id })
+        db.withTransaction {
+            val c = t.cliente(clienteId) ?: return@withTransaction
+            t.guardar(c.copy(borrado = true, actualizadoEn = ahora, pendiente = true))
+            t.prestamosVigentes(clienteId).forEach { p ->
+                t.pagosVigentes(p.id).forEach { t.guardar(it.copy(borrado = true, actualizadoEn = ahora, pendiente = true)) }
+                t.guardar(p.copy(borrado = true, actualizadoEn = ahora, pendiente = true))
+            }
         }
         alCambiar()
-        return hecho
+    }
+
+    /**
+     * Recupera a un cliente eliminado junto con lo que se borró con él:
+     * los préstamos y pagos que llevan la misma marca de tiempo que su eliminación.
+     * Un pago que ella borró antes a mano sigue borrado.
+     */
+    suspend fun restaurarCliente(clienteId: String) {
+        val ahora = System.currentTimeMillis()
+        db.withTransaction {
+            val c = t.cliente(clienteId) ?: return@withTransaction
+            if (!c.borrado) return@withTransaction
+            val marca = c.actualizadoEn
+            t.guardar(c.copy(borrado = false, actualizadoEn = ahora, pendiente = true))
+            t.prestamosDe(clienteId).forEach { p ->
+                t.pagosDe(p.id).filter { it.borrado && it.actualizadoEn == marca }
+                    .forEach { t.guardar(it.copy(borrado = false, actualizadoEn = ahora, pendiente = true)) }
+                if (p.borrado && p.actualizadoEn == marca) t.guardar(p.copy(borrado = false, actualizadoEn = ahora, pendiente = true))
+            }
+        }
+        alCambiar()
+    }
+
+    suspend fun editarCliente(clienteId: String, nombre: String, celular: String, dni: String) {
+        val c = t.cliente(clienteId) ?: return
+        t.guardar(c.copy(nombre = nombre.trim(), celular = celular, dni = dni, actualizadoEn = System.currentTimeMillis(), pendiente = true))
+        alCambiar()
+    }
+
+    suspend fun cambiarNota(prestamoId: String, nota: String) {
+        val p = t.prestamo(prestamoId) ?: return
+        t.guardar(p.copy(nota = nota.trim(), actualizadoEn = System.currentTimeMillis(), pendiente = true))
+        alCambiar()
     }
 
     private suspend fun cambiarPago(pagoId: String, cambio: (Pago) -> Pago) {

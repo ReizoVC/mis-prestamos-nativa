@@ -216,6 +216,19 @@ class CoreTest {
         assertFalse(esVersionMasNueva("basura", "1.0.0"))
     }
 
+    @Test fun `los eliminados van a la papelera y no cuentan`() {
+        val borrado = c.copy(id = "c2", nombre = "Ana", borrado = true, actualizadoEn = 9)
+        val l = Libro(listOf(c, borrado), listOf(p, p.copy(id = "p2", clienteId = "c2", borrado = true)), emptyList())
+        assertEquals(listOf("Rosa"), l.clientes.map { it.nombre })
+        assertEquals(listOf("Ana"), l.eliminados.map { it.nombre })
+        assertEquals(60_000, l.leDebenHoy)
+    }
+
+    @Test fun `mensaje de WhatsApp`() {
+        assertEquals("Hola Rosa, le escribo por el préstamo. A la fecha le falta pagar S/ 420.", mensajeWhatsapp("Rosa Huamán", 42_000))
+        assertEquals("Hola Rosa", mensajeWhatsapp("Rosa Huamán", 0))
+    }
+
     @Test fun formato() {
         assertEquals("S/ 1,250", soles(125_000))
         assertEquals("S/ 1,250.50", soles(125_050))

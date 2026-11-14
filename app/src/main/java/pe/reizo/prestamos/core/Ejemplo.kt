@@ -17,7 +17,7 @@ fun datosEjemplo(ahora: Long): DatosEjemplo {
     fun id(clave: String) = UUID.nameUUIDFromBytes("ejemplo-$clave".toByteArray()).toString()
 
     // prestamo = (prestó, paga, hace días) + pagos (monto, hace días)
-    class P(val presto: Int, val paga: Int, val hace: Int, vararg val pagos: Pair<Int, Int>)
+    class P(val presto: Int, val paga: Int, val hace: Int, vararg val pagos: Pair<Int, Int>, val nota: String = "")
 
     fun cliente(nombre: String, celular: String, dni: String, vararg ps: P) {
         val cid = id(dni)
@@ -28,12 +28,12 @@ fun datosEjemplo(ahora: Long): DatosEjemplo {
                 Pago(id("$dni-$i-$j"), pid, monto * 100L, ahora - hace * DIA, ahora)
             }
             pagos += suyos
-            val base = Prestamo(pid, cid, p.presto * 100L, p.paga * 100L, ahora - p.hace * DIA, null, ahora)
+            val base = Prestamo(pid, cid, p.presto * 100L, p.paga * 100L, ahora - p.hace * DIA, null, ahora, nota = p.nota)
             prestamos += base.copy(pagadoEn = pagadoEnSegun(base, suyos))
         }
     }
 
-    cliente("Rosa Huamán", "987112233", "45127893", P(500, 600, 40, 100 to 30, 80 to 22))
+    cliente("Rosa Huamán", "987112233", "45127893", P(500, 600, 40, 100 to 30, 80 to 22, nota = "Paga los sábados en el mercado"))
     cliente("Julio Quispe", "956443210", "40981254", P(1000, 1200, 43, 200 to 35, 300 to 26, 200 to 8))
     cliente("Pedro Mamani", "912876540", "47823019", P(300, 360, 25))
     cliente("Carmen Flores", "998223401", "42650987", P(200, 240, 12, 50 to 5))
