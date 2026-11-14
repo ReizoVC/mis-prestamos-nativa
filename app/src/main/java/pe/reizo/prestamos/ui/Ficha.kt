@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,7 +32,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import pe.reizo.prestamos.core.Cliente
 import pe.reizo.prestamos.core.Libro
@@ -76,14 +79,34 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
     var notaDe by remember { mutableStateOf<Prestamo?>(null) }
     val ambito = rememberCoroutineScope()
 
+    var menuAbierto by remember { mutableStateOf(false) }
+    val c = MaterialTheme.colorScheme
+
     Scaffold(
         topBar = {
             BarraInterna("Cliente", vm::volver) {
                 if (cliente != null) {
-                    TextButton(onClick = { editando = true }, modifier = Modifier.heightIn(min = ALTO_BOTON)) {
-                        Icon(Icons.Default.Edit, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Editar")
+                    // Lo que se usa poco (corregir datos, eliminar) vive en un menú y no ocupa pantalla
+                    Box {
+                        TextButton(onClick = { menuAbierto = true }, modifier = Modifier.heightIn(min = ALTO_BOTON)) {
+                            Icon(Icons.Default.MoreVert, null)
+                            Spacer(Modifier.width(4.dp))
+                            Text("Más")
+                        }
+                        DropdownMenu(expanded = menuAbierto, onDismissRequest = { menuAbierto = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Editar datos", style = MaterialTheme.typography.bodyLarge) },
+                                leadingIcon = { Icon(Icons.Default.Edit, null) },
+                                onClick = { menuAbierto = false; editando = true },
+                                modifier = Modifier.heightIn(min = 56.dp),
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Eliminar cliente", style = MaterialTheme.typography.bodyLarge, color = c.error) },
+                                leadingIcon = { Icon(Icons.Default.Delete, null, tint = c.error) },
+                                onClick = { menuAbierto = false; eliminando = true },
+                                modifier = Modifier.heightIn(min = 56.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -93,6 +116,8 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
         if (cliente == null) return@Scaffold
         val activos = libro.activosDe(clienteId)
         val pagados = libro.pagadosDe(clienteId)
+        // Con un solo préstamo, "Registrar pago" va arriba. Con varios, cada préstamo lleva el suyo.
+        val unico = activos.singleOrNull()
         Box(Modifier.padding(margen).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(
                 Modifier.widthIn(max = 600.dp).verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 32.dp),
@@ -102,10 +127,35 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
                     Text(cliente.nombre, style = MaterialTheme.typography.headlineMedium)
                     Text(
                         "Cel. ${celularBonito(cliente.celular)} · DNI ${cliente.dni}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = c.onSurfaceVariant,
                     )
                 }
+
+                if (activos.isNotEmpty()) {
+                    // Lo que ella viene a ver: cuánto le falta
+                    Column {
+                        Text("Le falta", style = MaterialTheme.typography.titleMedium, color = c.onSurfaceVariant)
+                        Text(
+                            soles(libro.deuda(clienteId)),
+                            style = MaterialTheme.typography.displaySmall.copy(fontSize = 48.sp, lineHeight = 56.sp),
+                            color = c.error,
+                        )
+                        Text(libro.estado(clienteId, vm.ahora), style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
+                    }
+                    if (unico != null) {
+                        Button(onClick = { pagoPara = unico }, modifier = Modifier.fillMaxWidth().height(64.dp)) {
+                            Text("Registrar pago", style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                } else {
+                    Tarjeta(color = c.primaryContainer) {
+                        val termino = libro.terminoEn(clienteId)?.let { " Terminó de pagar el ${fechaCorta(it, vm.ahora)}." } ?: ""
+                        Text("No debe nada.$termino", Modifier.padding(20.dp), style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+
+                // Los dos del mismo color: el único botón verde de la pantalla es "Registrar pago"
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     FilledTonalButton(
                         onClick = { abrirEnlace(ctx, Intent.ACTION_DIAL, "tel:${cliente.celular}") },
@@ -115,14 +165,13 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
                         Spacer(Modifier.width(8.dp))
                         Text("Llamar")
                     }
-                    Button(
+                    FilledTonalButton(
                         onClick = {
                             // Abre el chat con el mensaje ya escrito; ella decide si lo envía o lo cambia
                             val texto = Uri.encode(mensajeWhatsapp(cliente.nombre, libro.deuda(clienteId)))
                             abrirEnlace(ctx, Intent.ACTION_VIEW, "https://wa.me/51${cliente.celular}?text=$texto")
                         },
                         modifier = Modifier.weight(1f).height(ALTO_BOTON),
-                        colors = ButtonDefaults.buttonColors(containerColor = VerdeWhatsapp, contentColor = Color.White),
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Chat, null)
                         Spacer(Modifier.width(8.dp))
@@ -133,17 +182,11 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
                 activos.forEach { p ->
                     PrestamoActivo(
                         libro, p, vm.ahora,
+                        conBoton = unico == null,
                         alPagar = { pagoPara = p },
                         alTocarPago = { pagoElegido = it },
                         alTocarNota = { notaDe = p },
                     )
-                }
-
-                if (activos.isEmpty()) {
-                    Tarjeta(color = MaterialTheme.colorScheme.primaryContainer) {
-                        val termino = libro.terminoEn(clienteId)?.let { " Terminó de pagar el ${fechaCorta(it, vm.ahora)}." } ?: ""
-                        Text("No debe nada.$termino", Modifier.padding(20.dp), style = MaterialTheme.typography.titleMedium)
-                    }
                 }
 
                 if (pagados.isNotEmpty()) {
@@ -155,17 +198,6 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
                     onClick = { vm.abrir(Pantalla.Nuevo(clienteId)) },
                     modifier = Modifier.fillMaxWidth().heightIn(min = ALTO_BOTON),
                 ) { Text("Nuevo préstamo para ${primerNombre(cliente.nombre)}") }
-
-                // Lejos de los botones de uso diario, para no tocarlo sin querer
-                TextButton(
-                    onClick = { eliminando = true },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = ALTO_BOTON).padding(top = 16.dp),
-                ) {
-                    Icon(Icons.Default.Delete, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Eliminar cliente")
-                }
             }
         }
     }
@@ -324,77 +356,81 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
     }
 }
 
+/** Un préstamo que todavía debe: primero su detalle, a la vista, y debajo los pagos que hizo. */
 @Composable
 private fun PrestamoActivo(
     libro: Libro,
     p: Prestamo,
     ahora: Long,
+    conBoton: Boolean,
     alPagar: () -> Unit,
     alTocarPago: (Pago) -> Unit,
     alTocarNota: () -> Unit,
 ) {
     val pagado = libro.pagado(p)
-    val falta = libro.falta(p)
     val pagos = libro.pagosDe(p.id)
-    Tarjeta {
-        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("Préstamo del ${fechaCorta(p.creadoEn, ahora)}", style = MaterialTheme.typography.titleMedium)
-            LinearProgressIndicator(
-                progress = { if (p.montoAPagar > 0) pagado.toFloat() / p.montoAPagar else 0f },
-                modifier = Modifier.fillMaxWidth().height(12.dp),
-                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                drawStopIndicator = {},
-            )
-            Row {
-                Dato("Le prestó", soles(p.montoPrestado), Modifier.weight(1f))
-                Dato("Le va a pagar", soles(p.montoAPagar), Modifier.weight(1f))
-            }
-            Row(verticalAlignment = Alignment.Bottom) {
-                Dato("Ya pagó", soles(pagado), Modifier.weight(1f))
-                Column(Modifier.weight(1f)) {
-                    Text("Le falta", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(soles(falta), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.error)
+    val c = MaterialTheme.colorScheme
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Tarjeta {
+            Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text("Préstamo del ${fechaCorta(p.creadoEn, ahora)}", style = MaterialTheme.typography.titleMedium)
+                LinearProgressIndicator(
+                    progress = { if (p.montoAPagar > 0) pagado.toFloat() / p.montoAPagar else 0f },
+                    modifier = Modifier.fillMaxWidth().height(12.dp),
+                    trackColor = c.surfaceContainerHighest,
+                    drawStopIndicator = {},
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Dato("Le prestó", soles(p.montoPrestado), Modifier.weight(1f))
+                    Dato("Le va a pagar", soles(p.montoAPagar), Modifier.weight(1f))
+                    Dato("Ya pagó", soles(pagado), Modifier.weight(1f))
+                }
+                if (conBoton) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Le falta", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                        Text(soles(libro.falta(p)), style = MaterialTheme.typography.headlineSmall, color = c.error)
+                    }
+                    Button(onClick = alPagar, modifier = Modifier.fillMaxWidth().height(60.dp)) { Text("Registrar pago") }
                 }
             }
-            Button(onClick = alPagar, modifier = Modifier.fillMaxWidth().height(60.dp)) { Text("Registrar pago") }
-        }
-        // Nota: se toca para escribirla o cambiarla
-        Row(
-            Modifier.fillMaxWidth().clickable(onClickLabel = "Cambiar nota", onClick = alTocarNota)
-                .heightIn(min = ALTO_BOTON).padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(Icons.AutoMirrored.Filled.StickyNote2, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                p.nota.ifBlank { "Agregar una nota" },
-                Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (p.nota.isBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-            )
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerHigh)
-        Column(Modifier.padding(top = 14.dp, bottom = 8.dp)) {
-            Text("Pagos que hizo", Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.titleSmall)
-            if (pagos.isEmpty()) {
+            // Nota: se toca para escribirla o cambiarla
+            Row(
+                Modifier.fillMaxWidth().clickable(onClickLabel = "Cambiar nota", onClick = alTocarNota)
+                    .heightIn(min = ALTO_BOTON).padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Icon(Icons.AutoMirrored.Filled.StickyNote2, null, tint = c.onSurfaceVariant)
                 Text(
-                    "Todavía no hizo pagos.",
-                    Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    p.nota.ifBlank { "Agregar una nota" },
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (p.nota.isBlank()) c.primary else c.onSurface,
                 )
             }
-            pagos.forEach { pago ->
-                Row(
-                    Modifier.fillMaxWidth().clickable(onClickLabel = "Corregir o borrar") { alTocarPago(pago) }
-                        .heightIn(min = 56.dp).padding(horizontal = 20.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "${fechaCorta(pago.fecha, ahora)} · ${haceDias(diasEntre(pago.fecha, ahora))}",
-                        Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    Text(soles(pago.monto), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        }
+
+        Text("Pagos que hizo", Modifier.padding(start = 4.dp, top = 4.dp), style = MaterialTheme.typography.titleMedium)
+        if (pagos.isEmpty()) {
+            Text("Todavía no hizo pagos.", Modifier.padding(start = 4.dp), color = c.onSurfaceVariant)
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                pagos.forEachIndexed { i, pago ->
+                    val forma = formaEnGrupo(i, pagos.size)
+                    Surface(
+                        color = c.surfaceContainerLowest,
+                        shape = forma,
+                        modifier = Modifier.fillMaxWidth().clip(forma).clickable(onClickLabel = "Corregir o borrar") { alTocarPago(pago) },
+                    ) {
+                        Row(Modifier.heightIn(min = 60.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "${fechaCorta(pago.fecha, ahora)} · ${haceDias(diasEntre(pago.fecha, ahora))}",
+                                Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            Text(soles(pago.monto), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
         }

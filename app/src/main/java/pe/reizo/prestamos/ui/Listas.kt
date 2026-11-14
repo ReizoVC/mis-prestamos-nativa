@@ -32,35 +32,27 @@ import pe.reizo.prestamos.core.soles
 // Espacio al final de las listas para que el botón "Nuevo préstamo" no tape la última fila
 private val HUECO_BOTON = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp)
 
+// Formas de ordenar a los que están al día. Los atrasados siempre van arriba, del más atrasado al menos.
+private val ORDENES = listOf(
+    Filtro.TODOS to "Por nombre",
+    Filtro.DEBEN_MAS to "Los que deben más",
+    Filtro.NUEVOS to "Los más nuevos",
+)
+
 @Composable
 fun ListaClientes(vm: AppVM, libro: Libro) {
     val pendientes by vm.pendientes.collectAsStateWithLifecycle()
-    val clientes = libro.clientesActivos(vm.busqueda, vm.filtro, vm.ahora)
+    val orden = if (ORDENES.any { it.first == vm.filtro }) vm.filtro else Filtro.TODOS
+    val todos = libro.clientesActivos(vm.busqueda, orden, vm.ahora)
+    val atrasados = todos.filter { libro.estaSinPagar(it.id, vm.ahora) }.sortedByDescending { libro.diasSinPagar(it.id, vm.ahora) }
+    val alDia = todos.filter { !libro.estaSinPagar(it.id, vm.ahora) }
+    val c = MaterialTheme.colorScheme
+
     Column {
-        CampoBusqueda(vm.busqueda, { vm.busqueda = it }, Modifier.padding(horizontal = 16.dp))
-        // Un solo control en vez de cuatro botones: dice qué se está viendo y al tocarlo ofrece las otras opciones
-        Box(Modifier.padding(start = 6.dp, top = 2.dp, bottom = 2.dp)) {
-            var abierto by remember { mutableStateOf(false) }
-            TextButton(onClick = { abierto = true }, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text("Ver: ${vm.filtro.etiqueta}")
-                Icon(Icons.Default.ArrowDropDown, contentDescription = "Cambiar")
-            }
-            DropdownMenu(expanded = abierto, onDismissRequest = { abierto = false }) {
-                Filtro.entries.forEach { f ->
-                    DropdownMenuItem(
-                        text = { Text(f.etiqueta, style = MaterialTheme.typography.bodyLarge) },
-                        onClick = { vm.filtro = f; abierto = false },
-                        leadingIcon = {
-                            if (vm.filtro == f) Icon(Icons.Default.Check, contentDescription = "Elegido") else Spacer(Modifier.size(24.dp))
-                        },
-                        modifier = Modifier.heightIn(min = 56.dp),
-                    )
-                }
-            }
-        }
+        CampoBusqueda(vm.busqueda, { vm.busqueda = it }, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 4.dp))
         if (vm.nube.configurada && pendientes > 20) {
             Surface(
-                color = MaterialTheme.colorScheme.tertiaryContainer,
+                color = c.tertiaryContainer,
                 shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             ) {
@@ -71,25 +63,76 @@ fun ListaClientes(vm: AppVM, libro: Libro) {
             }
         }
         when {
-            clientes.isNotEmpty() -> LazyColumn(contentPadding = HUECO_BOTON, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                itemsIndexed(clientes, key = { _, c -> c.id }) { i, c ->
-                    FilaCliente(
-                        nombre = c.nombre,
-                        detalle = libro.estado(c.id, vm.ahora),
-                        derecha = soles(libro.deuda(c.id)),
-                        alerta = libro.estaSinPagar(c.id, vm.ahora),
-                        posicion = i, total = clientes.size,
-                        alTocar = { vm.abrir(Pantalla.Ficha(c.id)) },
-                        modifier = Modifier.animateItem(),
-                    )
+            todos.isNotEmpty() -> LazyColumn(contentPadding = HUECO_BOTON, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                // Primero los que hay que cobrar: un grupo aparte, con su título y cuántos son
+                if (atrasados.isNotEmpty()) {
+                    item(key = "titulo-atrasados") {
+                        TituloGrupo("Sin pagar hace $DIAS_SIN_PAGAR días o más (${atrasados.size})", alerta = true)
+                    }
+                    itemsIndexed(atrasados, key = { _, cl -> cl.id }) { i, cl ->
+                        FilaCliente(
+                            nombre = cl.nombre,
+                            detalle = "Hace ${libro.diasSinPagar(cl.id, vm.ahora)} días",
+                            derecha = soles(libro.deuda(cl.id)),
+                            alerta = true,
+                            posicion = i, total = atrasados.size,
+                            alTocar = { vm.abrir(Pantalla.Ficha(cl.id)) },
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
+                }
+                if (alDia.isNotEmpty()) {
+                    item(key = "titulo-al-dia") {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            TituloGrupo("Al día (${alDia.size})", alerta = false, modifier = Modifier.weight(1f))
+                            Box {
+                                var abierto by remember { mutableStateOf(false) }
+                                TextButton(onClick = { abierto = true }, modifier = Modifier.heightIn(min = 48.dp)) {
+                                    Text("Ordenar")
+                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                                }
+                                DropdownMenu(expanded = abierto, onDismissRequest = { abierto = false }) {
+                                    ORDENES.forEach { (f, texto) ->
+                                        DropdownMenuItem(
+                                            text = { Text(texto, style = MaterialTheme.typography.bodyLarge) },
+                                            onClick = { vm.filtro = f; abierto = false },
+                                            leadingIcon = {
+                                                if (orden == f) Icon(Icons.Default.Check, contentDescription = "Elegido") else Spacer(Modifier.size(24.dp))
+                                            },
+                                            modifier = Modifier.heightIn(min = 56.dp),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    itemsIndexed(alDia, key = { _, cl -> cl.id }) { i, cl ->
+                        FilaCliente(
+                            nombre = cl.nombre,
+                            detalle = libro.estado(cl.id, vm.ahora),
+                            derecha = soles(libro.deuda(cl.id)),
+                            alerta = false,
+                            posicion = i, total = alDia.size,
+                            alTocar = { vm.abrir(Pantalla.Ficha(cl.id)) },
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
                 }
             }
             !libro.hayActivos() -> Vacio("Todavía no hay préstamos. Toque Nuevo préstamo para registrar el primero.")
-            vm.busqueda.isNotBlank() -> Vacio("No hay clientes con ese nombre.")
-            vm.filtro == Filtro.SIN_PAGAR -> Vacio("Todos pagaron en los últimos $DIAS_SIN_PAGAR días.")
             else -> Vacio("No hay clientes con ese nombre.")
         }
     }
+}
+
+@Composable
+private fun TituloGrupo(texto: String, alerta: Boolean, modifier: Modifier = Modifier) {
+    Text(
+        texto,
+        modifier = modifier.padding(start = 4.dp, top = 14.dp, bottom = 8.dp),
+        style = MaterialTheme.typography.titleSmall,
+        color = if (alerta) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
