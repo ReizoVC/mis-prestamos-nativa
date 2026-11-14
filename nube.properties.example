@@ -1,0 +1,4 @@
+# Copie este archivo como nube.properties y llene los dos valores para activar la nube (Supabase).
+# Si no existe o está vacío, la app funciona en modo solo en este celular.
+SUPABASE_URL=
+SUPABASE_ANON_KEY=

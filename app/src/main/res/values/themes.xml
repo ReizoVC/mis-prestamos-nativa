@@ -1,0 +1,9 @@
+<resources>
+    <color name="fondo">#F7F8F5</color>
+    <color name="verde">#1D6B48</color>
+    <style name="Tema.Prestamos" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/fondo</item>
+        <item name="colorPrimary">@color/verde</item>
+        <item name="colorAccent">@color/verde</item>
+    </style>
+</resources>

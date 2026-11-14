@@ -1,0 +1,144 @@
+package pe.reizo.prestamos.core
+
+import java.text.Collator
+import java.util.Locale
+
+const val DIAS_SIN_PAGAR = 15
+
+enum class Filtro(val etiqueta: String) {
+    TODOS("Todos"), DEBEN_MAS("Deben más"), SIN_PAGAR("Sin pagar"), NUEVOS("Nuevos")
+}
+
+data class Movimiento(val id: String, val esPago: Boolean, val nombre: String, val fecha: Long, val monto: Long)
+
+data class Resumen(
+    val presto: Long,
+    val cobro: Long,
+    val gano: Long,
+    val terminados: List<Prestamo>,
+    val movimientos: List<Movimiento>,
+)
+
+fun ganancia(p: Prestamo): Long = p.montoAPagar - p.montoPrestado
+
+/**
+ * Fecha en que el préstamo quedó pagado según sus pagos vigentes, o null si todavía debe.
+ * Si ya estaba cerrado y sigue completo, conserva su fecha.
+ */
+fun pagadoEnSegun(p: Prestamo, pagosVigentes: List<Pago>): Long? {
+    val pagos = pagosVigentes.filter { !it.borrado }
+    if (pagos.sumOf { it.monto } < p.montoAPagar) return null
+    return p.pagadoEn ?: pagos.maxOf { it.fecha }
+}
+
+/** Foto de todos los datos. Todas las cuentas de la app salen de aquí. */
+class Libro(clientes: List<Cliente>, prestamos: List<Prestamo>, pagos: List<Pago>) {
+    val clientes: List<Cliente> = clientes.filter { !it.borrado }
+    val prestamos: List<Prestamo> = prestamos.filter { !it.borrado }
+    val pagos: List<Pago> = pagos.filter { !it.borrado }
+
+    private val clientePorId = this.clientes.associateBy { it.id }
+    private val prestamoPorId = this.prestamos.associateBy { it.id }
+    private val porCliente = this.prestamos.groupBy { it.clienteId }
+    private val porPrestamo = this.pagos.groupBy { it.prestamoId }
+    private val alfabeto = Collator.getInstance(Locale("es"))
+
+    fun cliente(id: String): Cliente? = clientePorId[id]
+    fun prestamo(id: String): Prestamo? = prestamoPorId[id]
+
+    /** Préstamos del cliente, el más reciente primero. */
+    fun prestamosDe(clienteId: String): List<Prestamo> = porCliente[clienteId].orEmpty().sortedByDescending { it.creadoEn }
+
+    /** Pagos del préstamo, el más reciente primero. */
+    fun pagosDe(prestamoId: String): List<Pago> = porPrestamo[prestamoId].orEmpty().sortedByDescending { it.fecha }
+
+    fun pagado(p: Prestamo): Long = porPrestamo[p.id].orEmpty().sumOf { it.monto }
+    fun falta(p: Prestamo): Long = (p.montoAPagar - pagado(p)).coerceAtLeast(0)
+
+    fun activosDe(clienteId: String): List<Prestamo> = prestamosDe(clienteId).filter { it.pagadoEn == null }
+    fun pagadosDe(clienteId: String): List<Prestamo> =
+        prestamosDe(clienteId).filter { it.pagadoEn != null }.sortedByDescending { it.pagadoEn }
+
+    fun deuda(clienteId: String): Long = activosDe(clienteId).sumOf { falta(it) }
+    fun esActivo(clienteId: String): Boolean = porCliente[clienteId].orEmpty().any { it.pagadoEn == null }
+    fun esAntiguo(clienteId: String): Boolean = !porCliente[clienteId].isNullOrEmpty() && !esActivo(clienteId)
+
+    fun ultimoPago(clienteId: String): Pago? =
+        activosDe(clienteId).flatMap { porPrestamo[it.id].orEmpty() }.maxByOrNull { it.fecha }
+
+    /** Fecha del último pago; si no hay pagos, la del préstamo activo más antiguo. */
+    fun ultimoMovimiento(clienteId: String): Long? =
+        ultimoPago(clienteId)?.fecha ?: activosDe(clienteId).minOfOrNull { it.creadoEn }
+
+    fun diasSinPagar(clienteId: String, ahora: Long): Int =
+        ultimoMovimiento(clienteId)?.let { diasEntre(it, ahora) } ?: 0
+
+    fun estaSinPagar(clienteId: String, ahora: Long): Boolean =
+        esActivo(clienteId) && diasSinPagar(clienteId, ahora) >= DIAS_SIN_PAGAR
+
+    /** Texto bajo el nombre en la lista de clientes. */
+    fun estado(clienteId: String, ahora: Long): String {
+        val pago = ultimoPago(clienteId)
+        val dias = diasSinPagar(clienteId, ahora)
+        return when {
+            dias >= DIAS_SIN_PAGAR && pago != null -> "Sin pagos hace $dias días"
+            dias >= DIAS_SIN_PAGAR -> "Sin pagos desde que prestó ($dias días)"
+            pago != null -> "Pagó ${soles(pago.monto)} ${haceDias(dias)}"
+            else -> "Sin pagos aún · prestó ${haceDias(dias)}"
+        }
+    }
+
+    private fun coincide(c: Cliente, texto: String): Boolean {
+        val t = normalizar(texto)
+        return t.isEmpty() || normalizar(c.nombre).contains(t) || c.dni.contains(t)
+    }
+
+    fun clientesActivos(texto: String, filtro: Filtro, ahora: Long): List<Cliente> {
+        val base = clientes.filter { esActivo(it.id) && coincide(it, texto) }
+        return when (filtro) {
+            Filtro.TODOS -> base.sortedWith { a, b -> alfabeto.compare(a.nombre, b.nombre) }
+            Filtro.DEBEN_MAS -> base.sortedByDescending { deuda(it.id) }
+            Filtro.SIN_PAGAR -> base.filter { estaSinPagar(it.id, ahora) }.sortedByDescending { diasSinPagar(it.id, ahora) }
+            Filtro.NUEVOS -> base.sortedByDescending { c -> activosDe(c.id).maxOf { it.creadoEn } }
+        }
+    }
+
+    fun hayActivos(): Boolean = clientes.any { esActivo(it.id) }
+
+    /** Fecha en que el cliente antiguo terminó su último préstamo. */
+    fun terminoEn(clienteId: String): Long? = porCliente[clienteId].orEmpty().mapNotNull { it.pagadoEn }.maxOrNull()
+
+    fun clientesAntiguos(texto: String): List<Cliente> =
+        clientes.filter { esAntiguo(it.id) && coincide(it, texto) }.sortedByDescending { terminoEn(it.id) }
+
+    /** Hasta 5 clientes (activos y antiguos) para autocompletar. */
+    fun sugerencias(texto: String): List<Cliente> {
+        if (texto.trim().length < 2) return emptyList()
+        return clientes.filter { coincide(it, texto) }
+            .sortedWith { a, b -> alfabeto.compare(a.nombre, b.nombre) }
+            .take(5)
+    }
+
+    val leDebenHoy: Long get() = prestamos.filter { it.pagadoEn == null }.sumOf { falta(it) }
+    val ganara: Long get() = prestamos.filter { it.pagadoEn == null }.sumOf { ganancia(it) }
+
+    fun resumen(rango: Rango): Resumen {
+        val dentro = rango.desde..rango.hasta
+        val nuevos = prestamos.filter { it.creadoEn in dentro }
+        val cobrados = pagos.filter { it.fecha in dentro }
+        val terminados = prestamos.filter { it.pagadoEn != null && it.pagadoEn in dentro }.sortedByDescending { it.pagadoEn }
+        val movimientos = nuevos.map {
+            Movimiento(it.id, false, cliente(it.clienteId)?.nombre ?: "—", it.creadoEn, it.montoPrestado)
+        } + cobrados.map {
+            val nombre = prestamo(it.prestamoId)?.let { p -> cliente(p.clienteId)?.nombre } ?: "—"
+            Movimiento(it.id, true, nombre, it.fecha, it.monto)
+        }
+        return Resumen(
+            presto = nuevos.sumOf { it.montoPrestado },
+            cobro = cobrados.sumOf { it.monto },
+            gano = terminados.sumOf { ganancia(it) },
+            terminados = terminados,
+            movimientos = movimientos.sortedByDescending { it.fecha },
+        )
+    }
+}

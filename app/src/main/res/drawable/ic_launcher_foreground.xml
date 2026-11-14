@@ -1,0 +1,15 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- libreta -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M39,28h32a5,5 0,0 1,5 5v42a5,5 0,0 1,-5 5h-32a5,5 0,0 1,-5 -5v-42a5,5 0,0 1,5 -5z" />
+    <!-- anillas -->
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="3" android:strokeLineCap="round"
+        android:pathData="M29,39h9M29,54h9M29,69h9" />
+    <path android:strokeColor="#1D6B48" android:strokeWidth="3" android:strokeLineCap="round"
+        android:pathData="M36,39h4M36,54h4M36,69h4" />
+    <!-- S/ -->
+    <path android:strokeColor="#1D6B48" android:strokeWidth="4.5" android:strokeLineCap="round"
+        android:pathData="M58,46.5C58,41.5 46,41 46,47.5C46,54 58,53 58,60.5C58,67 45.5,66.5 45.5,61.5M69,42L61,66" />
+</vector>
