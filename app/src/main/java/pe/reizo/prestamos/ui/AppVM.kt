@@ -37,7 +37,7 @@ import java.time.LocalDate
 sealed interface Pantalla {
     data class Ficha(val clienteId: String) : Pantalla
     data class Nuevo(val clienteId: String?) : Pantalla
-    data object Ganancia : Pantalla
+    data class Desglose(val tipo: TipoDesglose) : Pantalla
     data object Ajustes : Pantalla
     data object Papelera : Pantalla
 }

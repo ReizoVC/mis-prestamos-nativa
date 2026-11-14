@@ -170,8 +170,13 @@ class CoreTest {
         assertEquals(75_000, mes.presto)
         // Pagos de noviembre: Julio 200 (8), Carmen 50 (5), Lucía 30 (2), Wilmer 100 (10) y 60 (1), Félix 300 (6)
         assertEquals(74_000, mes.cobro)
-        assertEquals(9, mes.movimientos.size)
-        assertTrue(mes.movimientos.zipWithNext().all { (a, b) -> a.fecha >= b.fecha })
+        // Las listas del desglose suman lo mismo que la cifra y van de lo más reciente a lo más antiguo
+        assertEquals(3, mes.prestados.size)
+        assertEquals(6, mes.cobrados.size)
+        assertEquals(mes.presto, mes.prestados.sumOf { it.montoPrestado })
+        assertEquals(mes.cobro, mes.cobrados.sumOf { it.monto })
+        assertEquals("Wilmer", primerNombre(libro.cliente(libro.prestamo(mes.cobrados.first().prestamoId)!!.clienteId)!!.nombre))
+        assertTrue(mes.cobrados.zipWithNext().all { (a, b) -> a.fecha >= b.fecha })
     }
 
     @Test fun `le deben hoy y ganara`() {

@@ -81,7 +81,7 @@ private fun Navegacion(vm: AppVM, libro: Libro) {
                 null -> Inicio(vm, libro, avisos)
                 is Pantalla.Ficha -> Ficha(vm, libro, pantalla.clienteId, avisos)
                 is Pantalla.Nuevo -> NuevoPrestamo(vm, libro, pantalla.clienteId, avisos)
-                Pantalla.Ganancia -> Ganancia(vm, libro)
+                is Pantalla.Desglose -> Desglose(vm, libro, pantalla.tipo)
                 Pantalla.Ajustes -> Ajustes(vm, libro, avisos)
                 Pantalla.Papelera -> Papelera(vm, libro, avisos)
             }

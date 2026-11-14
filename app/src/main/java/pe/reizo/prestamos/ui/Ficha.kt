@@ -184,15 +184,15 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
             alGuardar = { monto, fecha ->
                 pagoPara = null
                 ambito.launch {
-                    val termino = vm.repo.registrarPago(p.id, monto, fecha)
+                    val guardado = vm.repo.registrarPago(p.id, monto, fecha)
                     val quedanOtros = libro.activosDe(clienteId).any { it.id != p.id }
-                    vm.avisar(
-                        when {
-                            termino && !quedanOtros -> "${primerNombre(nombre)} terminó de pagar. Pasa a Antiguos."
-                            termino -> "${primerNombre(nombre)} terminó de pagar este préstamo."
-                            else -> "Pago de ${soles(monto)} guardado"
-                        },
-                    )
+                    val texto = when {
+                        guardado.termino && !quedanOtros -> "${primerNombre(nombre)} terminó de pagar. Pasa a Antiguos."
+                        guardado.termino -> "${primerNombre(nombre)} terminó de pagar este préstamo."
+                        else -> "Pago de ${soles(monto)} guardado"
+                    }
+                    // Si se equivocó de monto o de cliente, lo quita con un toque
+                    vm.avisar(texto, "Deshacer") { vm.repo.borrarPago(guardado.id) }
                 }
             },
         )

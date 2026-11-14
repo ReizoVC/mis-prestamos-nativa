@@ -7,11 +7,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,20 +38,24 @@ fun ListaClientes(vm: AppVM, libro: Libro) {
     val clientes = libro.clientesActivos(vm.busqueda, vm.filtro, vm.ahora)
     Column {
         CampoBusqueda(vm.busqueda, { vm.busqueda = it }, Modifier.padding(horizontal = 16.dp))
-        // Los cuatro filtros siempre a la vista: si no caben en una fila, bajan a la siguiente
-        FlowRow(
-            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Filtro.entries.forEach { f ->
-                FilterChip(
-                    selected = vm.filtro == f,
-                    onClick = { vm.filtro = f },
-                    label = { Text(f.etiqueta) },
-                    leadingIcon = if (vm.filtro == f) ({ Icon(Icons.Default.Check, null, Modifier.size(20.dp)) }) else null,
-                    modifier = Modifier.height(48.dp),
-                )
+        // Un solo control en vez de cuatro botones: dice qué se está viendo y al tocarlo ofrece las otras opciones
+        Box(Modifier.padding(start = 6.dp, top = 2.dp, bottom = 2.dp)) {
+            var abierto by remember { mutableStateOf(false) }
+            TextButton(onClick = { abierto = true }, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text("Ver: ${vm.filtro.etiqueta}")
+                Icon(Icons.Default.ArrowDropDown, contentDescription = "Cambiar")
+            }
+            DropdownMenu(expanded = abierto, onDismissRequest = { abierto = false }) {
+                Filtro.entries.forEach { f ->
+                    DropdownMenuItem(
+                        text = { Text(f.etiqueta, style = MaterialTheme.typography.bodyLarge) },
+                        onClick = { vm.filtro = f; abierto = false },
+                        leadingIcon = {
+                            if (vm.filtro == f) Icon(Icons.Default.Check, contentDescription = "Elegido") else Spacer(Modifier.size(24.dp))
+                        },
+                        modifier = Modifier.heightIn(min = 56.dp),
+                    )
+                }
             }
         }
         if (vm.nube.configurada && pendientes > 20) {

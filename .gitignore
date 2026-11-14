@@ -8,3 +8,4 @@ nube.properties
 *.apk
 *.jks
 *.env
+graphify-out/

@@ -36,16 +36,20 @@ class Repo(private val db: BaseDatos, private val alCambiar: () -> Unit) {
         return id
     }
 
-    /** Devuelve true si con este pago terminó de pagar el préstamo. `fecha` null = ahora. */
-    suspend fun registrarPago(prestamoId: String, monto: Long, fecha: Long? = null): Boolean {
+    /** Registra un pago. `fecha` null = ahora. */
+    suspend fun registrarPago(prestamoId: String, monto: Long, fecha: Long? = null): PagoGuardado {
         val ahora = System.currentTimeMillis()
+        val id = nuevoId()
         val termino = db.withTransaction {
-            t.guardar(Pago(nuevoId(), prestamoId, monto, fecha ?: ahora, ahora))
+            t.guardar(Pago(id, prestamoId, monto, fecha ?: ahora, ahora))
             recalcular(prestamoId, ahora)
         }
         alCambiar()
-        return termino
+        return PagoGuardado(id, termino)
     }
+
+    /** `id` sirve para deshacer el pago; `termino` dice si con él se terminó de pagar el préstamo. */
+    class PagoGuardado(val id: String, val termino: Boolean)
 
     suspend fun corregirPago(pagoId: String, monto: Long) = cambiarPago(pagoId) { it.copy(monto = monto) }
     suspend fun borrarPago(pagoId: String) = cambiarPago(pagoId) { it.copy(borrado = true) }

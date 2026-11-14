@@ -9,14 +9,13 @@ enum class Filtro(val etiqueta: String) {
     TODOS("Todos"), DEBEN_MAS("Deben más"), SIN_PAGAR("Sin pagar"), NUEVOS("Nuevos")
 }
 
-data class Movimiento(val id: String, val esPago: Boolean, val nombre: String, val fecha: Long, val monto: Long)
-
 data class Resumen(
     val presto: Long,
     val cobro: Long,
     val gano: Long,
-    val terminados: List<Prestamo>,
-    val movimientos: List<Movimiento>,
+    val prestados: List<Prestamo>,    // forman "Prestó", el más reciente primero
+    val cobrados: List<Pago>,         // forman "Cobró", el más reciente primero
+    val terminados: List<Prestamo>,   // forman "Ganó", por fecha de término
 )
 
 fun ganancia(p: Prestamo): Long = p.montoAPagar - p.montoPrestado
@@ -126,21 +125,16 @@ class Libro(clientes: List<Cliente>, prestamos: List<Prestamo>, pagos: List<Pago
 
     fun resumen(rango: Rango): Resumen {
         val dentro = rango.desde..rango.hasta
-        val nuevos = prestamos.filter { it.creadoEn in dentro }
-        val cobrados = pagos.filter { it.fecha in dentro }
+        val prestados = prestamos.filter { it.creadoEn in dentro }.sortedByDescending { it.creadoEn }
+        val cobrados = pagos.filter { it.fecha in dentro }.sortedByDescending { it.fecha }
         val terminados = prestamos.filter { it.pagadoEn != null && it.pagadoEn in dentro }.sortedByDescending { it.pagadoEn }
-        val movimientos = nuevos.map {
-            Movimiento(it.id, false, cliente(it.clienteId)?.nombre ?: "—", it.creadoEn, it.montoPrestado)
-        } + cobrados.map {
-            val nombre = prestamo(it.prestamoId)?.let { p -> cliente(p.clienteId)?.nombre } ?: "—"
-            Movimiento(it.id, true, nombre, it.fecha, it.monto)
-        }
         return Resumen(
-            presto = nuevos.sumOf { it.montoPrestado },
+            presto = prestados.sumOf { it.montoPrestado },
             cobro = cobrados.sumOf { it.monto },
             gano = terminados.sumOf { ganancia(it) },
+            prestados = prestados,
+            cobrados = cobrados,
             terminados = terminados,
-            movimientos = movimientos.sortedByDescending { it.fecha },
         )
     }
 }
