@@ -34,8 +34,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // Para publicar: subir los dos. versionCode siempre aumenta de uno en uno.
-        versionCode = (findProperty("vc") as String?)?.toInt() ?: 5
-        versionName = (findProperty("vn") as String?) ?: "1.0.4"
+        versionCode = (findProperty("vc") as String?)?.toInt() ?: 6
+        versionName = (findProperty("vn") as String?) ?: "1.0.5"
         buildConfigField("String", "ACTUALIZACIONES_URL", "\"$fuenteActualizaciones\"")
         manifestPlaceholders["textoClaro"] = (fuentePrueba != null).toString()
         // MODO DESARROLLO: mientras sea true la app NO guarda nada. Los datos viven en memoria,
@@ -82,6 +82,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.1")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.1")
     implementation("androidx.biometric:biometric:1.1.0")
+    // biometric trae fragment 1.2.5, que rechaza los códigos del selector de archivos (respaldo) y cierra la app
+    implementation("androidx.fragment:fragment-ktx:1.8.6")
     implementation("androidx.room:room-runtime:2.7.2")
     implementation("androidx.room:room-ktx:2.7.2")
     ksp("androidx.room:room-compiler:2.7.2")
