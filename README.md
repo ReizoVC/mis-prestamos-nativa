@@ -64,7 +64,9 @@ Notas:
 
 La especificación se tomó como guía. Lo que se decidió distinto y por qué:
 
-| Tema | Especificación | Aquí |
+| Tema | Claro | Se elige en Ajustes: Claro (de fábrica), Oscuro o Como el celular |
+| Tamaño de letra | Fijo | Se elige en Ajustes: Normal, Grande o Muy grande, encima del tamaño del celular |
+| "Sin pagar" | 15 días fijos | Se elige en Ajustes: 7, 15 o 30 días (de fábrica 15) |
 |---|---|---|
 | Tecnología | PWA con React | App nativa: Kotlin, Compose, Material 3, Room (SQLite) |
 | Bloqueo | PIN propio de 4 dígitos | El bloqueo del celular (huella, rostro, patrón o clave). No hay PIN que olvidar ni pantalla de "Olvidé mi PIN". Se puede apagar en Ajustes. |

@@ -4,6 +4,8 @@ package pe.reizo.prestamos.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -61,7 +63,7 @@ fun ResumenPestana(vm: AppVM, libro: Libro) {
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val cortos = listOf(Periodo.HOY, Periodo.SEMANA, Periodo.MES, Periodo.ANIO)
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().height(ALTO_BOTON)) {
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = ALTO_BOTON)) {
                 cortos.forEachIndexed { i, p ->
                     SegmentedButton(
                         selected = vm.periodo == p,
@@ -69,7 +71,16 @@ fun ResumenPestana(vm: AppVM, libro: Libro) {
                         shape = SegmentedButtonDefaults.itemShape(i, cortos.size),
                         icon = {},
                         modifier = Modifier.fillMaxHeight(),
-                    ) { Text(p.etiqueta, maxLines = 1) }
+                    ) {
+                        // Con letra "Muy grande" no caben cuatro palabras: la letra se achica lo justo en vez de cortarse
+                        val estilo = LocalTextStyle.current
+                        BasicText(
+                            p.etiqueta,
+                            style = estilo.copy(color = LocalContentColor.current),
+                            maxLines = 1,
+                            autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = estilo.fontSize),
+                        )
+                    }
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -78,7 +89,7 @@ fun ResumenPestana(vm: AppVM, libro: Libro) {
                     onClick = { eligiendoFechas = true },
                     label = { Text("Elegir fechas") },
                     leadingIcon = { Icon(Icons.Default.DateRange, null, Modifier.size(22.dp)) },
-                    modifier = Modifier.height(52.dp),
+                    modifier = Modifier.heightIn(min = 52.dp),
                 )
                 Text(rango.texto, style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
             }

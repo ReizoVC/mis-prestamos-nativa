@@ -14,6 +14,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import pe.reizo.prestamos.BuildConfig
 import pe.reizo.prestamos.core.Cliente
+import pe.reizo.prestamos.core.DIAS_SIN_PAGAR
 import pe.reizo.prestamos.core.Filtro
 import pe.reizo.prestamos.core.Libro
 import pe.reizo.prestamos.core.Periodo
@@ -47,14 +49,31 @@ class Aviso(val texto: String, val accion: String?, val alAccion: (suspend () ->
 
 enum class Pestana { CLIENTES, ANTIGUOS, RESUMEN }
 
+enum class TemaApp(val etiqueta: String) { CLARO("Claro"), OSCURO("Oscuro"), SISTEMA("Como el celular") }
+
+/** Tamaño de la letra dentro de la app, encima del que ya tenga el celular. */
+enum class Letra(val etiqueta: String, val escala: Float) { NORMAL("Normal", 1f), GRANDE("Grande", 1.15f), MUY_GRANDE("Muy grande", 1.3f) }
+
 class AppVM(app: Application) : AndroidViewModel(app) {
     private val db = BaseDatos.abrir(app, enMemoria = BuildConfig.MODO_DESARROLLO)
     val nube = Nube(app, db, viewModelScope)
     val repo = Repo(db) { nube.pedir() }.also { nube.repo = it }
     private val prefs = app.getSharedPreferences("ajustes", Context.MODE_PRIVATE)
 
+    // ---- preferencias de Ajustes. La app arranca en modo claro.
+    var tema by mutableStateOf(enumDe(prefs.getString("tema", null), TemaApp.CLARO))
+        private set
+    var letra by mutableStateOf(enumDe(prefs.getString("letra", null), Letra.NORMAL))
+        private set
+    private val diasSinPagar = MutableStateFlow(prefs.getInt("dias_sin_pagar", DIAS_SIN_PAGAR))
+    val diasSinPagarElegidos: StateFlow<Int> get() = diasSinPagar
+
+    fun cambiarTema(t: TemaApp) { prefs.edit().putString("tema", t.name).apply(); tema = t }
+    fun cambiarLetra(l: Letra) { prefs.edit().putString("letra", l.name).apply(); letra = l }
+    fun cambiarDiasSinPagar(d: Int) { prefs.edit().putInt("dias_sin_pagar", d).apply(); diasSinPagar.value = d }
+
     val libro: StateFlow<Libro?> = db.tablas().let { t ->
-        combine(t.verClientes(), t.verPrestamos(), t.verPagos()) { c, p, g -> Libro(c, p, g) }
+        combine(t.verClientes(), t.verPrestamos(), t.verPagos(), diasSinPagar) { c, p, g, d -> Libro(c, p, g, d) }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     val pendientes: StateFlow<Int> = db.tablas().verPendientes().stateIn(viewModelScope, SharingStarted.Eagerly, 0)
@@ -181,6 +200,9 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() { db.close() }
+
+    private inline fun <reified E : Enum<E>> enumDe(nombre: String?, defecto: E): E =
+        enumValues<E>().firstOrNull { it.name == nombre } ?: defecto
 
     companion object {
         const val FORMAS_DE_DESBLOQUEO = BIOMETRIC_WEAK or DEVICE_CREDENTIAL

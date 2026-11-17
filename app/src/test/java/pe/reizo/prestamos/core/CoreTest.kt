@@ -234,6 +234,17 @@ class CoreTest {
         assertEquals("Hola Rosa", mensajeWhatsapp("Rosa Huamán", 0))
     }
 
+    @Test fun `el limite de sin pagar se puede cambiar`() {
+        val a7 = Libro(ejemplo.clientes, ejemplo.prestamos, ejemplo.pagos, diasSinPagar = 7)
+        val a30 = Libro(ejemplo.clientes, ejemplo.prestamos, ejemplo.pagos, diasSinPagar = 30)
+        // Con 7 días entra también Julio (8 días sin pagar); con 30 solo queda Teodoro (38)
+        assertEquals(listOf("Teodoro", "Pedro", "Rosa", "Julio"), nombres(a7.clientesActivos("", Filtro.SIN_PAGAR, ahora)))
+        assertEquals(listOf("Teodoro"), nombres(a30.clientesActivos("", Filtro.SIN_PAGAR, ahora)))
+        assertEquals("Sin pagos hace 8 días", a7.estado(id("Julio"), ahora))
+        assertEquals("Sin pagos hace 22 días", libro.estado(id("Rosa"), ahora))
+        assertEquals("Pagó S/ 80 hace 22 días", a30.estado(id("Rosa"), ahora))
+    }
+
     @Test fun formato() {
         assertEquals("S/ 1,250", soles(125_000))
         assertEquals("S/ 1,250.50", soles(125_050))

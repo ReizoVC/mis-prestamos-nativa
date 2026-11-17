@@ -206,7 +206,7 @@ fun NuevoPrestamo(vm: AppVM, libro: Libro, clienteInicial: String?, avisos: Snac
                     )
                 }
 
-                Button(onClick = ::guardar, enabled = !guardando, modifier = Modifier.fillMaxWidth().height(66.dp)) {
+                Button(onClick = ::guardar, enabled = !guardando, modifier = Modifier.fillMaxWidth().heightIn(min = 66.dp)) {
                     Text("Guardar préstamo", style = MaterialTheme.typography.titleMedium)
                 }
             }

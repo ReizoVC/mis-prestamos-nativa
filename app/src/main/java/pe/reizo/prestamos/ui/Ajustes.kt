@@ -10,13 +10,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.FormatSize
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
@@ -33,6 +37,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import pe.reizo.prestamos.BuildConfig
 import pe.reizo.prestamos.core.Libro
+import pe.reizo.prestamos.core.OPCIONES_DIAS_SIN_PAGAR
 import pe.reizo.prestamos.core.dia
 import pe.reizo.prestamos.core.fechaCorta
 import pe.reizo.prestamos.data.EstadoNube
@@ -95,45 +100,49 @@ fun Ajustes(vm: AppVM, libro: Libro, avisos: SnackbarHostState) {
                         )
                         FilledTonalButton(
                             onClick = vm::reiniciarEjemplo,
-                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp).height(ALTO_BOTON),
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp).heightIn(min = ALTO_BOTON),
                         ) { Text("Volver a los datos de ejemplo") }
                     }
                 }
 
-                // ---- nube
-                if (!BuildConfig.MODO_DESARROLLO) Tarjeta {
-                    val cambios = if (pendientes == 1) "Hay 1 cambio esperando" else "Hay $pendientes cambios esperando"
-                    val texto = when {
-                        estado == EstadoNube.SOLO_LOCAL -> "Modo solo en este celular (nube no configurada)"
-                        estado == EstadoNube.SIN_INTERNET && pendientes > 0 -> "Sin internet. $cambios para subirse."
-                        estado == EstadoNube.SIN_INTERNET -> "Sin internet. No hay cambios esperando para subirse."
-                        estado == EstadoNube.ERROR -> "No se pudo guardar en la nube. Se intentará de nuevo."
-                        pendientes > 0 -> "$cambios para subirse."
-                        ultima > 0 -> "Todo guardado en la nube · ${haceRato(ultima, vm.ahora)}"
-                        else -> "Todo guardado en la nube"
-                    }
-                    val bien = estado == EstadoNube.OK && pendientes == 0
-                    Fila(
-                        icono = when {
-                            estado == EstadoNube.SOLO_LOCAL -> Icons.Default.PhoneAndroid
-                            bien -> Icons.Default.CloudDone
-                            else -> Icons.Default.CloudOff
-                        },
-                        titulo = texto,
+                // ---- Apariencia
+                TituloSeccion("Apariencia")
+                Tarjeta {
+                    Opciones(
+                        icono = Icons.Default.Palette,
+                        titulo = "Tema",
+                        detalle = null,
+                        opciones = TemaApp.entries.map { it to it.etiqueta },
+                        elegido = vm.tema,
+                        alElegir = vm::cambiarTema,
                     )
-                    if (vm.nube.configurada) {
-                        FilledTonalButton(
-                            onClick = {
-                                sincronizando = true
-                                ambito.launch { vm.nube.sincronizar(); sincronizando = false }
-                            },
-                            enabled = !sincronizando,
-                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp).height(ALTO_BOTON),
-                        ) { Text(if (sincronizando) "Sincronizando…" else "Sincronizar ahora") }
-                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerHigh)
+                    Opciones(
+                        icono = Icons.Default.FormatSize,
+                        titulo = "Tamaño de letra",
+                        detalle = "Se ve al instante en toda la app.",
+                        opciones = Letra.entries.map { it to it.etiqueta },
+                        elegido = vm.letra,
+                        alElegir = vm::cambiarLetra,
+                    )
                 }
 
-                // ---- bloqueo
+                // ---- Cobranza
+                TituloSeccion("Cobranza")
+                Tarjeta {
+                    val dias by vm.diasSinPagarElegidos.collectAsStateWithLifecycle()
+                    Opciones(
+                        icono = Icons.Default.Schedule,
+                        titulo = "Cuándo pasa a \"Sin pagar\"",
+                        detalle = "Si un cliente no paga en este tiempo, sube al grupo rojo de Clientes.",
+                        opciones = OPCIONES_DIAS_SIN_PAGAR.map { it to "$it días" },
+                        elegido = dias,
+                        alElegir = vm::cambiarDiasSinPagar,
+                    )
+                }
+
+                // ---- Seguridad
+                TituloSeccion("Seguridad")
                 Tarjeta {
                     Fila(
                         icono = Icons.Default.Fingerprint,
@@ -146,8 +155,41 @@ fun Ajustes(vm: AppVM, libro: Libro, avisos: SnackbarHostState) {
                     }
                 }
 
-                // ---- respaldo
+                // ---- Sus datos
+                TituloSeccion("Sus datos")
                 Tarjeta {
+                    if (!BuildConfig.MODO_DESARROLLO) {
+                        val cambios = if (pendientes == 1) "Hay 1 cambio esperando" else "Hay $pendientes cambios esperando"
+                        val texto = when {
+                            estado == EstadoNube.SOLO_LOCAL -> "Modo solo en este celular (nube no configurada)"
+                            estado == EstadoNube.SIN_INTERNET && pendientes > 0 -> "Sin internet. $cambios para subirse."
+                            estado == EstadoNube.SIN_INTERNET -> "Sin internet. No hay cambios esperando para subirse."
+                            estado == EstadoNube.ERROR -> "No se pudo guardar en la nube. Se intentará de nuevo."
+                            pendientes > 0 -> "$cambios para subirse."
+                            ultima > 0 -> "Todo guardado en la nube · ${haceRato(ultima, vm.ahora)}"
+                            else -> "Todo guardado en la nube"
+                        }
+                        val bien = estado == EstadoNube.OK && pendientes == 0
+                        Fila(
+                            icono = when {
+                                estado == EstadoNube.SOLO_LOCAL -> Icons.Default.PhoneAndroid
+                                bien -> Icons.Default.CloudDone
+                                else -> Icons.Default.CloudOff
+                            },
+                            titulo = texto,
+                        )
+                        if (vm.nube.configurada) {
+                            FilledTonalButton(
+                                onClick = {
+                                    sincronizando = true
+                                    ambito.launch { vm.nube.sincronizar(); sincronizando = false }
+                                },
+                                enabled = !sincronizando,
+                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp).heightIn(min = ALTO_BOTON),
+                            ) { Text(if (sincronizando) "Sincronizando…" else "Sincronizar ahora") }
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerHigh)
+                    }
                     Fila(
                         icono = Icons.Default.Save,
                         titulo = "Guardar respaldo",
@@ -161,9 +203,7 @@ fun Ajustes(vm: AppVM, libro: Libro, avisos: SnackbarHostState) {
                         detalle = "Trae los datos de un archivo de respaldo. No borra lo que ya hay.",
                         alTocar = { abrirArchivo.launch(arrayOf("application/json", "application/octet-stream", "text/plain")) },
                     )
-                }
-
-                Tarjeta {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerHigh)
                     val n = libro.eliminados.size
                     Fila(
                         Icons.Default.DeleteOutline, "Clientes eliminados",
@@ -176,14 +216,8 @@ fun Ajustes(vm: AppVM, libro: Libro, avisos: SnackbarHostState) {
                     )
                 }
 
-                if (vm.nube.configurada) {
-                    Tarjeta {
-                        Fila(Icons.AutoMirrored.Filled.Logout, "Cerrar sesión", alTocar = {
-                            if (pendientes > 0) vm.avisar("Primero conéctese a internet para subir los cambios.") else cerrando = true
-                        })
-                    }
-                }
-
+                // ---- Aplicación
+                TituloSeccion("Aplicación")
                 Tarjeta {
                     Fila(
                         Icons.Default.SystemUpdate, "Versión ${BuildConfig.VERSION_NAME}",
@@ -191,6 +225,12 @@ fun Ajustes(vm: AppVM, libro: Libro, avisos: SnackbarHostState) {
                         else "Toque para buscar una versión nueva.",
                         alTocar = { vm.buscarActualizacion(aMano = true) },
                     )
+                    if (vm.nube.configurada) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerHigh)
+                        Fila(Icons.AutoMirrored.Filled.Logout, "Cerrar sesión", alTocar = {
+                            if (pendientes > 0) vm.avisar("Primero conéctese a internet para subir los cambios.") else cerrando = true
+                        })
+                    }
                 }
             }
         }
@@ -222,6 +262,50 @@ fun Ajustes(vm: AppVM, libro: Libro, avisos: SnackbarHostState) {
             confirmButton = { TextButton(onClick = { cerrando = false; vm.nube.cerrarSesion() }) { Text("Sí, cerrar") } },
             dismissButton = { TextButton(onClick = { cerrando = false }) { Text("No") } },
         )
+    }
+}
+
+@Composable
+private fun TituloSeccion(texto: String) {
+    Text(
+        texto,
+        Modifier.padding(start = 4.dp, top = 12.dp),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+    )
+}
+
+/**
+ * Una preferencia con pocas opciones. Van como botones que bajan de línea si no caben,
+ * así siguen leyéndose bien con la letra "Muy grande".
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun <T> Opciones(
+    icono: ImageVector,
+    titulo: String,
+    detalle: String?,
+    opciones: List<Pair<T, String>>,
+    elegido: T,
+    alElegir: (T) -> Unit,
+) {
+    Column(Modifier.padding(bottom = 14.dp)) {
+        Fila(icono, titulo, detalle)
+        FlowRow(
+            Modifier.padding(start = 16.dp, end = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            opciones.forEach { (valor, texto) ->
+                FilterChip(
+                    selected = valor == elegido,
+                    onClick = { alElegir(valor) },
+                    label = { Text(texto) },
+                    leadingIcon = if (valor == elegido) ({ Icon(Icons.Default.Check, null, Modifier.size(20.dp)) }) else null,
+                    modifier = Modifier.heightIn(min = 48.dp),
+                )
+            }
+        }
     }
 }
 
@@ -275,7 +359,7 @@ fun Papelera(vm: AppVM, libro: Libro, avisos: SnackbarHostState) {
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            FilledTonalButton(onClick = { vm.recuperarCliente(c) }, modifier = Modifier.height(ALTO_BOTON)) { Text("Recuperar") }
+                            FilledTonalButton(onClick = { vm.recuperarCliente(c) }, modifier = Modifier.heightIn(min = ALTO_BOTON)) { Text("Recuperar") }
                         }
                     }
                 }

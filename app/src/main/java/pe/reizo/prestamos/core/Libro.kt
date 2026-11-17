@@ -3,7 +3,9 @@ package pe.reizo.prestamos.core
 import java.text.Collator
 import java.util.Locale
 
+/** Valor de fábrica. Ella lo puede cambiar en Ajustes (7, 15 o 30 días). */
 const val DIAS_SIN_PAGAR = 15
+val OPCIONES_DIAS_SIN_PAGAR = listOf(7, 15, 30)
 
 enum class Filtro(val etiqueta: String) {
     TODOS("Todos"), DEBEN_MAS("Deben más"), SIN_PAGAR("Sin pagar"), NUEVOS("Nuevos")
@@ -31,7 +33,13 @@ fun pagadoEnSegun(p: Prestamo, pagosVigentes: List<Pago>): Long? {
 }
 
 /** Foto de todos los datos. Todas las cuentas de la app salen de aquí. */
-class Libro(clientes: List<Cliente>, prestamos: List<Prestamo>, pagos: List<Pago>) {
+class Libro(
+    clientes: List<Cliente>,
+    prestamos: List<Prestamo>,
+    pagos: List<Pago>,
+    /** Desde cuántos días sin pagar un cliente pasa a "Sin pagar". */
+    val diasSinPagar: Int = DIAS_SIN_PAGAR,
+) {
     val clientes: List<Cliente> = clientes.filter { !it.borrado }
     /** Clientes eliminados (papelera), el más reciente primero. */
     val eliminados: List<Cliente> = clientes.filter { it.borrado }.sortedByDescending { it.actualizadoEn }
@@ -75,15 +83,15 @@ class Libro(clientes: List<Cliente>, prestamos: List<Prestamo>, pagos: List<Pago
         ultimoMovimiento(clienteId)?.let { diasEntre(it, ahora) } ?: 0
 
     fun estaSinPagar(clienteId: String, ahora: Long): Boolean =
-        esActivo(clienteId) && diasSinPagar(clienteId, ahora) >= DIAS_SIN_PAGAR
+        esActivo(clienteId) && diasSinPagar(clienteId, ahora) >= diasSinPagar
 
     /** Texto bajo el nombre en la lista de clientes. */
     fun estado(clienteId: String, ahora: Long): String {
         val pago = ultimoPago(clienteId)
         val dias = diasSinPagar(clienteId, ahora)
         return when {
-            dias >= DIAS_SIN_PAGAR && pago != null -> "Sin pagos hace $dias días"
-            dias >= DIAS_SIN_PAGAR -> "Sin pagos desde que prestó ($dias días)"
+            dias >= diasSinPagar && pago != null -> "Sin pagos hace $dias días"
+            dias >= diasSinPagar -> "Sin pagos desde que prestó ($dias días)"
             pago != null -> "Pagó ${soles(pago.monto)} ${haceDias(dias)}"
             else -> "Sin pagos aún · prestó ${haceDias(dias)}"
         }

@@ -1,6 +1,5 @@
 package pe.reizo.prestamos.ui
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -8,6 +7,9 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -98,11 +100,15 @@ private val Formas = Shapes(
 )
 
 @Composable
-fun TemaPrestamos(contenido: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) Oscuro else Claro,
-        typography = Tipos,
-        shapes = Formas,
-        content = contenido,
-    )
+fun TemaPrestamos(oscuro: Boolean, escalaLetra: Float, contenido: @Composable () -> Unit) {
+    // La letra crece encima del tamaño que ya tenga el celular; los espacios y botones no cambian
+    val d = LocalDensity.current
+    CompositionLocalProvider(LocalDensity provides Density(d.density, d.fontScale * escalaLetra)) {
+        MaterialTheme(
+            colorScheme = if (oscuro) Oscuro else Claro,
+            typography = Tipos,
+            shapes = Formas,
+            content = contenido,
+        )
+    }
 }

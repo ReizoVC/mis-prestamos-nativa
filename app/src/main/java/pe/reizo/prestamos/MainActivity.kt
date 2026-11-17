@@ -1,14 +1,19 @@
 package pe.reizo.prestamos
 
+import android.graphics.Color
 import android.os.Bundle
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.biometric.BiometricPrompt
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.DisposableEffect
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import pe.reizo.prestamos.ui.App
 import pe.reizo.prestamos.ui.AppVM
+import pe.reizo.prestamos.ui.TemaApp
 import pe.reizo.prestamos.ui.TemaPrestamos
 
 private const val CINCO_MINUTOS = 5 * 60_000L
@@ -20,7 +25,22 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        setContent { TemaPrestamos { App(vm, ::pedirDesbloqueo) } }
+        setContent {
+            val oscuro = when (vm.tema) {
+                TemaApp.CLARO -> false
+                TemaApp.OSCURO -> true
+                TemaApp.SISTEMA -> isSystemInDarkTheme()
+            }
+            // Los íconos de la barra de arriba (hora, batería) siguen al tema de la app, no al del celular
+            DisposableEffect(oscuro) {
+                enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { oscuro },
+                    navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { oscuro },
+                )
+                onDispose {}
+            }
+            TemaPrestamos(oscuro, vm.letra.escala) { App(vm, ::pedirDesbloqueo) }
+        }
     }
 
     override fun onStart() {

@@ -144,7 +144,7 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
                         Text(libro.estado(clienteId, vm.ahora), style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
                     }
                     if (unico != null) {
-                        Button(onClick = { pagoPara = unico }, modifier = Modifier.fillMaxWidth().height(64.dp)) {
+                        Button(onClick = { pagoPara = unico }, modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp)) {
                             Text("Registrar pago", style = MaterialTheme.typography.titleMedium)
                         }
                     }
@@ -159,7 +159,7 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     FilledTonalButton(
                         onClick = { abrirEnlace(ctx, Intent.ACTION_DIAL, "tel:${cliente.celular}") },
-                        modifier = Modifier.weight(1f).height(ALTO_BOTON),
+                        modifier = Modifier.weight(1f).heightIn(min = ALTO_BOTON),
                     ) {
                         Icon(Icons.Default.Call, null)
                         Spacer(Modifier.width(8.dp))
@@ -171,7 +171,7 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
                             val texto = Uri.encode(mensajeWhatsapp(cliente.nombre, libro.deuda(clienteId)))
                             abrirEnlace(ctx, Intent.ACTION_VIEW, "https://wa.me/51${cliente.celular}?text=$texto")
                         },
-                        modifier = Modifier.weight(1f).height(ALTO_BOTON),
+                        modifier = Modifier.weight(1f).heightIn(min = ALTO_BOTON),
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Chat, null)
                         Spacer(Modifier.width(8.dp))
@@ -390,7 +390,7 @@ private fun PrestamoActivo(
                         Text("Le falta", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                         Text(soles(libro.falta(p)), style = MaterialTheme.typography.headlineSmall, color = c.error)
                     }
-                    Button(onClick = alPagar, modifier = Modifier.fillMaxWidth().height(60.dp)) { Text("Registrar pago") }
+                    Button(onClick = alPagar, modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp)) { Text("Registrar pago") }
                 }
             }
             // Nota: se toca para escribirla o cambiarla
@@ -486,7 +486,7 @@ private fun HojaPago(
                 fun RowScope.rapido(etiqueta: String, valor: Long) {
                     FilledTonalButton(
                         onClick = { texto = montoParaCampo(valor); error = null },
-                        modifier = Modifier.weight(1f).height(ALTO_BOTON),
+                        modifier = Modifier.weight(1f).heightIn(min = ALTO_BOTON),
                         contentPadding = PaddingValues(horizontal = 4.dp),
                     ) { Text(etiqueta) }
                 }
@@ -525,7 +525,7 @@ private fun HojaPago(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                FilledTonalButton(onClick = alCerrar, modifier = Modifier.weight(1f).height(60.dp)) { Text("Cancelar") }
+                FilledTonalButton(onClick = alCerrar, modifier = Modifier.weight(1f).heightIn(min = 60.dp)) { Text("Cancelar") }
                 Button(
                     onClick = {
                         error = errorPago(monto, maximo)
@@ -535,7 +535,7 @@ private fun HojaPago(
                             alGuardar(monto, otroDia?.let { inicioDia(it) + 12 * 3_600_000L })
                         }
                     },
-                    modifier = Modifier.weight(1f).height(60.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = 60.dp),
                 ) { Text("Guardar") }
             }
         }
@@ -609,7 +609,7 @@ private fun HojaEditarCliente(
                 modifier = Modifier.fillMaxWidth(),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                FilledTonalButton(onClick = alCerrar, modifier = Modifier.weight(1f).height(60.dp)) { Text("Cancelar") }
+                FilledTonalButton(onClick = alCerrar, modifier = Modifier.weight(1f).heightIn(min = 60.dp)) { Text("Cancelar") }
                 Button(
                     onClick = {
                         errores = listOf(
@@ -619,7 +619,7 @@ private fun HojaEditarCliente(
                         )
                         if (errores.all { it == null }) alGuardar(nombre, celular, dni)
                     },
-                    modifier = Modifier.weight(1f).height(60.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = 60.dp),
                 ) { Text("Guardar") }
             }
         }

@@ -138,7 +138,7 @@ private fun Inicio(vm: AppVM, libro: Libro, avisos: SnackbarHostState) {
                     text = { Text("Nuevo préstamo") },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.height(64.dp),
+                    modifier = Modifier.heightIn(min = 64.dp),
                 )
             }
         },
@@ -183,7 +183,7 @@ private fun AvisoActualizacion(vm: AppVM) {
                             containerColor = MaterialTheme.colorScheme.inverseOnSurface,
                             contentColor = MaterialTheme.colorScheme.inverseSurface,
                         ),
-                        modifier = Modifier.height(ALTO_BOTON),
+                        modifier = Modifier.heightIn(min = ALTO_BOTON),
                     ) { Text("Actualizar") }
                 }
             }
@@ -219,7 +219,7 @@ private fun Bloqueo(pedir: () -> Unit) {
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(32.dp))
-        Button(onClick = pedir, modifier = Modifier.fillMaxWidth().height(64.dp)) { Text("Entrar") }
+        Button(onClick = pedir, modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp)) { Text("Entrar") }
     }
 }
 
@@ -259,7 +259,7 @@ private fun InicioSesion(vm: AppVM) {
                 }
             },
             enabled = !entrando && correo.isNotBlank() && clave.isNotEmpty(),
-            modifier = Modifier.fillMaxWidth().height(64.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp),
         ) { Text(if (entrando) "Entrando…" else "Entrar") }
     }
 }

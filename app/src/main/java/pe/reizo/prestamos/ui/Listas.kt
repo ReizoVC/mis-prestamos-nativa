@@ -23,7 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import pe.reizo.prestamos.core.DIAS_SIN_PAGAR
 import pe.reizo.prestamos.core.Filtro
 import pe.reizo.prestamos.core.Libro
 import pe.reizo.prestamos.core.fechaCorta
@@ -67,7 +66,7 @@ fun ListaClientes(vm: AppVM, libro: Libro) {
                 // Primero los que hay que cobrar: un grupo aparte, con su título y cuántos son
                 if (atrasados.isNotEmpty()) {
                     item(key = "titulo-atrasados") {
-                        TituloGrupo("Sin pagar hace $DIAS_SIN_PAGAR días o más (${atrasados.size})", alerta = true)
+                        TituloGrupo("Sin pagar hace ${libro.diasSinPagar} días o más (${atrasados.size})", alerta = true)
                     }
                     itemsIndexed(atrasados, key = { _, cl -> cl.id }) { i, cl ->
                         FilaCliente(
