@@ -64,9 +64,7 @@ Notas:
 
 La especificación se tomó como guía. Lo que se decidió distinto y por qué:
 
-| Tema | Claro | Se elige en Ajustes: Claro (de fábrica), Oscuro o Como el celular |
-| Tamaño de letra | Fijo | Se elige en Ajustes: Normal, Grande o Muy grande, encima del tamaño del celular |
-| "Sin pagar" | 15 días fijos | Se elige en Ajustes: 7, 15 o 30 días (de fábrica 15) |
+| Tema | Especificación | Aquí |
 |---|---|---|
 | Tecnología | PWA con React | App nativa: Kotlin, Compose, Material 3, Room (SQLite) |
 | Bloqueo | PIN propio de 4 dígitos | El bloqueo del celular (huella, rostro, patrón o clave). No hay PIN que olvidar ni pantalla de "Olvidé mi PIN". Se puede apagar en Ajustes. |
@@ -75,11 +73,13 @@ La especificación se tomó como guía. Lo que se decidió distinto y por qué:
 | Avisos | Arriba, 2.6 s | Abajo (snackbar de Android) |
 | Periodos del resumen | Grilla de botones y dos campos de fecha | Botones segmentados y el calendario de rango de Android |
 | Menú de un pago | Menú al tocar | Hoja inferior con "Corregir monto" y "Borrar pago" |
-| Fuente | Atkinson Hyperlegible | La del sistema, con los mismos tamaños grandes; respeta el tamaño de letra configurado en el celular |
-| Tema | Claro | Claro y oscuro, según el celular |
+| Fuente | Atkinson Hyperlegible | Atkinson Hyperlegible, incluida en el APK |
+| Tema | Claro | Se elige en Ajustes: Claro (de fábrica), Oscuro o Como el celular |
+| Tamaño de letra | Fijo | Se elige en Ajustes: Normal, Grande o Muy grande, encima del tamaño del celular. Los botones crecen con la letra |
+| "Sin pagar" | 15 días fijos | Se elige en Ajustes: 7, 15 o 30 días (de fábrica 15) |
 | Montos | Número con decimales | Céntimos enteros en la base; se convierten a soles al exportar o sincronizar |
-| Actualizaciones | Aviso "Hay una versión nueva" | Instalar el APK nuevo encima |
-| Eliminar cliente | No existía | Botón al final de la ficha, con confirmación y "Deshacer". Se lleva sus préstamos y pagos (quedan marcados como borrados, no se destruyen). |
+| Actualizaciones | Aviso "Hay una versión nueva" | Igual: la app revisa GitHub Releases, muestra el aviso y descarga el APK nuevo |
+| Eliminar cliente | No existía | En el menú "Más" de la ficha, con confirmación y "Deshacer". Se recupera desde Ajustes > Clientes eliminados |
 | Respaldo | Solo guardar | Guardar y también **recuperar** un respaldo. El archivo tiene el mismo formato que el de la versión web, así que sirve para pasar los datos de una a otra. |
 | Copia automática | No | Además, Android incluye los datos en la copia de seguridad de Google del celular |
 
