@@ -12,36 +12,49 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.core.content.res.ResourcesCompat
 import pe.reizo.prestamos.R
 import pe.reizo.prestamos.core.Cliente
+import pe.reizo.prestamos.core.DiaTarjeta
+import pe.reizo.prestamos.core.EstadoDia
 import pe.reizo.prestamos.core.Libro
-import pe.reizo.prestamos.core.Pago
 import pe.reizo.prestamos.core.Prestamo
+import pe.reizo.prestamos.core.dia
+import pe.reizo.prestamos.core.diasTarjeta
 import pe.reizo.prestamos.core.fechaCorta
 import pe.reizo.prestamos.core.mensajeWhatsapp
+import pe.reizo.prestamos.core.mesLargo
+import pe.reizo.prestamos.core.mesesTarjeta
 import pe.reizo.prestamos.core.soles
 import java.io.File
+import java.time.YearMonth
 
-private const val POR_FILA = 5
+private val SEMANA = listOf("L", "M", "M", "J", "V", "S", "D")
 
-/** Casillas de la tarjeta: los pagos hechos y, si todavía debe, una fila con espacio para los que vienen. */
-fun casillasTarjeta(pagos: Int, termino: Boolean): Int {
-    val llenas = (pagos + POR_FILA - 1) / POR_FILA * POR_FILA
-    return if (termino) llenas.coerceAtLeast(POR_FILA) else maxOf(llenas + if (pagos % POR_FILA == 0) POR_FILA else 0, 2 * POR_FILA)
+private fun nombreMes(mes: YearMonth) = mesLargo(mes.atDay(1))
+
+private fun resumenMes(dias: List<DiaTarjeta>): String {
+    val pagos = dias.filter { it.estado == EstadoDia.PAGO }
+    val sinPago = dias.count { it.estado == EstadoDia.SIN_PAGO }
+    val pago = if (pagos.size == 1) "Pagó 1 día" else "Pagó ${pagos.size} días"
+    val falto = if (sinPago == 1) "no pagó 1 día" else "no pagó $sinPago días"
+    return "$pago (${soles(pagos.sumOf { it.monto })}) · $falto"
 }
 
-/** La tarjeta de cobranza de papel, hecha con los pagos registrados: cada casilla es un pago. */
+/** La tarjeta de cobranza de papel como calendario del mes: verde si pagó, rojo si no pagó. */
 @Composable
 fun TarjetaCobranza(vm: AppVM, libro: Libro, prestamoId: String) {
     val p = libro.prestamo(prestamoId)
@@ -50,12 +63,15 @@ fun TarjetaCobranza(vm: AppVM, libro: Libro, prestamoId: String) {
     val c = MaterialTheme.colorScheme
     Scaffold(topBar = { BarraInterna("Tarjeta de cobranza", vm::volver) }) { margen ->
         if (p == null || cliente == null) return@Scaffold
-        val pagos = libro.pagosDe(p.id).reversed()   // el primer pago es la casilla 1
-        val total = casillasTarjeta(pagos.size, libro.falta(p) == 0L)
+        val hoy = dia(vm.ahora)
+        val meses = mesesTarjeta(p, hoy)
+        var indice by rememberSaveable(prestamoId) { mutableIntStateOf(meses.lastIndex) }
+        val mes = meses[indice.coerceIn(meses.indices)]
+        val dias = diasTarjeta(p, libro.pagosDe(p.id), mes, hoy)
         Box(Modifier.padding(margen).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(
                 Modifier.widthIn(max = 600.dp).verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Column {
                     Text(cliente.nombre, style = MaterialTheme.typography.headlineSmall)
@@ -65,13 +81,42 @@ fun TarjetaCobranza(vm: AppVM, libro: Libro, prestamoId: String) {
                         color = c.onSurfaceVariant,
                     )
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    (0 until total).chunked(POR_FILA).forEach { fila ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            fila.forEach { i -> Casilla(i + 1, pagos.getOrNull(i), vm.ahora, Modifier.weight(1f)) }
+
+                // Mes: con flechas para ver los anteriores
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { indice-- }, enabled = indice > 0, modifier = Modifier.size(56.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Mes anterior")
+                    }
+                    Text(nombreMes(mes), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    IconButton(onClick = { indice++ }, enabled = indice < meses.lastIndex, modifier = Modifier.size(56.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Mes siguiente")
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SEMANA.forEach {
+                            Text(it, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = c.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        }
+                    }
+                    val vacios = mes.atDay(1).dayOfWeek.value - 1   // lunes = 0
+                    val celdas: List<DiaTarjeta?> = List(vacios) { null } + dias
+                    celdas.chunked(7).forEach { semana ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            semana.forEach { d -> if (d == null) Spacer(Modifier.weight(1f)) else DiaCasilla(d, Modifier.weight(1f)) }
+                            repeat(7 - semana.size) { Spacer(Modifier.weight(1f)) }
                         }
                     }
                 }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Leyenda(c.primaryContainer, "Pagó")
+                    Leyenda(c.errorContainer, "No pagó")
+                    Leyenda(c.tertiaryContainer, "Prestó")
+                }
+                Text(resumenMes(dias), style = MaterialTheme.typography.bodyLarge)
+
+                HorizontalDivider(color = c.surfaceContainerHigh)
                 Row {
                     Column(Modifier.weight(1f)) {
                         Text("Ya pagó", style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant)
@@ -83,7 +128,7 @@ fun TarjetaCobranza(vm: AppVM, libro: Libro, prestamoId: String) {
                     }
                 }
                 Button(
-                    onClick = { enviarTarjeta(ctx, libro, p, cliente, vm.ahora) },
+                    onClick = { enviarTarjeta(ctx, libro, p, cliente, vm.ahora, mes) },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp),
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Send, null)
@@ -96,92 +141,117 @@ fun TarjetaCobranza(vm: AppVM, libro: Libro, prestamoId: String) {
 }
 
 @Composable
-private fun Casilla(numero: Int, pago: Pago?, ahora: Long, modifier: Modifier) {
+private fun DiaCasilla(d: DiaTarjeta, modifier: Modifier) {
     val c = MaterialTheme.colorScheme
     val forma = MaterialTheme.shapes.small
+    val (fondo, texto) = when (d.estado) {
+        EstadoDia.PAGO -> c.primaryContainer to c.onPrimaryContainer
+        EstadoDia.SIN_PAGO -> c.errorContainer to c.onErrorContainer
+        EstadoDia.PRESTO -> c.tertiaryContainer to c.onTertiaryContainer
+        EstadoDia.HOY -> c.surface to c.onSurface
+        EstadoDia.FUERA, EstadoDia.FUTURO -> Color.Transparent to c.outline
+    }
     Surface(
-        color = if (pago != null) c.primaryContainer else c.surface,
-        contentColor = if (pago != null) c.onPrimaryContainer else c.onSurfaceVariant,
+        color = fondo,
+        contentColor = texto,
         shape = forma,
-        modifier = modifier.heightIn(min = 76.dp).let { if (pago == null) it.border(1.dp, c.outlineVariant, forma) else it },
+        modifier = modifier.heightIn(min = 56.dp).let { if (d.estado == EstadoDia.HOY) it.border(2.dp, c.primary, forma) else it },
     ) {
-        Column(Modifier.padding(vertical = 6.dp, horizontal = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("$numero", style = MaterialTheme.typography.labelMedium)
-            if (pago != null) {
-                Text(fechaCorta(pago.fecha, ahora), style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center, maxLines = 1)
-                Text(soles(pago.monto).removePrefix("S/ "), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1)
+        Column(Modifier.padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("${d.fecha.dayOfMonth}", style = MaterialTheme.typography.labelLarge)
+            when (d.estado) {
+                EstadoDia.PAGO -> Text(soles(d.monto).removePrefix("S/ "), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+                EstadoDia.SIN_PAGO -> Text("✕", style = MaterialTheme.typography.labelMedium)
+                else -> {}
             }
         }
     }
 }
 
-/** Dibuja la tarjeta como imagen (siempre en colores claros, como el papel) para mandarla al cliente. */
-fun imagenTarjeta(ctx: Context, libro: Libro, p: Prestamo, cliente: Cliente, ahora: Long): Bitmap {
-    val pagos = libro.pagosDe(p.id).reversed()
-    val total = casillasTarjeta(pagos.size, libro.falta(p) == 0L)
+@Composable
+private fun Leyenda(color: Color, texto: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Surface(color = color, shape = MaterialTheme.shapes.extraSmall, modifier = Modifier.size(18.dp)) {}
+        Text(texto, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** Dibuja la tarjeta del mes como imagen (siempre en colores claros, como el papel) para mandarla al cliente. */
+fun imagenTarjeta(ctx: Context, libro: Libro, p: Prestamo, cliente: Cliente, ahora: Long, mes: YearMonth): Bitmap {
+    val dias = diasTarjeta(p, libro.pagosDe(p.id), mes, dia(ahora))
+    val vacios = mes.atDay(1).dayOfWeek.value - 1
+    val semanas = (vacios + dias.size + 6) / 7
     val ancho = 1080f
-    val m = 56f
-    val hueco = 14f
-    val lado = (ancho - 2 * m - hueco * (POR_FILA - 1)) / POR_FILA
-    val alto = lado * 0.85f
-    val filas = total / POR_FILA
-    val inicioGrilla = 330f
-    val altoTotal = inicioGrilla + filas * (alto + hueco) + 230f
+    val m = 48f
+    val hueco = 10f
+    val lado = (ancho - 2 * m - hueco * 6) / 7
+    val alto = lado * 0.95f
+    val inicioGrilla = 420f
+    val pie = inicioGrilla + semanas * (alto + hueco) + 40f
+    val altoTotal = pie + 300f
 
     val normal = ResourcesCompat.getFont(ctx, R.font.atkinson_regular)
     val negrita = ResourcesCompat.getFont(ctx, R.font.atkinson_bold)
-    fun pincel(tam: Float, color: Int, bold: Boolean = false, centro: Boolean = false) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = tam; this.color = color; typeface = if (bold) negrita else normal
-        if (centro) textAlign = Paint.Align.CENTER
+    fun pincel(tam: Float, color: Int, bold: Boolean = false, alinear: Paint.Align = Paint.Align.LEFT) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = tam; this.color = color; typeface = if (bold) negrita else normal; textAlign = alinear
     }
+    val centro = Paint.Align.CENTER
     val tinta = 0xFF1C1B1F.toInt()
-    val gris = 0xFF5F5E5A.toInt()
-    val verde = 0xFF1B5E20.toInt()
-    val rojo = 0xFFB3261E.toInt()
+    val gris = 0xFF6F6E69.toInt()
+    val verdeFondo = 0xFFD6EDCF.toInt(); val verde = 0xFF1B5E20.toInt()
+    val rojoFondo = 0xFFF9D6D3.toInt(); val rojo = 0xFFB3261E.toInt()
+    val ambarFondo = 0xFFFBE3B8.toInt(); val ambar = 0xFF7A4B00.toInt()
 
     val bmp = Bitmap.createBitmap(ancho.toInt(), altoTotal.toInt(), Bitmap.Config.ARGB_8888)
     val cv = Canvas(bmp)
     cv.drawColor(0xFFFFFDF5.toInt())
-    cv.drawText("Tarjeta de cobranza", ancho / 2, 110f, pincel(64f, tinta, bold = true, centro = true))
-    cv.drawText(cliente.nombre, m, 200f, pincel(46f, tinta, bold = true))
-    cv.drawText("Préstamo del ${fechaCorta(p.creadoEn, ahora)} · va a pagar ${soles(p.montoAPagar)}", m, 262f, pincel(36f, gris))
+    cv.drawText("Tarjeta de cobranza", ancho / 2, 100f, pincel(60f, tinta, bold = true, alinear = centro))
+    cv.drawText(cliente.nombre, m, 185f, pincel(44f, tinta, bold = true))
+    cv.drawText("Préstamo del ${fechaCorta(p.creadoEn, ahora)} · va a pagar ${soles(p.montoAPagar)}", m, 240f, pincel(34f, gris))
+    cv.drawText(nombreMes(mes), ancho / 2, 320f, pincel(44f, tinta, bold = true, alinear = centro))
+    val sem = pincel(30f, gris, bold = true, alinear = centro)
+    SEMANA.forEachIndexed { i, s -> cv.drawText(s, m + i * (lado + hueco) + lado / 2, 395f, sem) }
 
-    val borde = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 3f; color = 0xFFB4B2A9.toInt() }
-    val relleno = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFDCEFD4.toInt() }
-    val num = pincel(28f, gris, centro = true)
-    val fecha = pincel(30f, verde, centro = true)
-    val monto = pincel(36f, verde, bold = true, centro = true)
-    for (i in 0 until total) {
-        val x = m + (i % POR_FILA) * (lado + hueco)
-        val y = inicioGrilla + (i / POR_FILA) * (alto + hueco)
+    val borde = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2f; color = 0xFFD3D1C7.toInt() }
+    val relleno = Paint(Paint.ANTI_ALIAS_FLAG)
+    dias.forEachIndexed { i, d ->
+        val pos = vacios + i
+        val x = m + (pos % 7) * (lado + hueco)
+        val y = inicioGrilla + (pos / 7) * (alto + hueco)
         val r = RectF(x, y, x + lado, y + alto)
-        val pago = pagos.getOrNull(i)
-        if (pago != null) cv.drawRoundRect(r, 14f, 14f, relleno)
-        cv.drawRoundRect(r, 14f, 14f, borde)
-        cv.drawText("${i + 1}", r.centerX(), y + 38f, num)
-        if (pago != null) {
-            cv.drawText(fechaCorta(pago.fecha, ahora), r.centerX(), y + 86f, fecha)
-            cv.drawText(soles(pago.monto), r.centerX(), y + 134f, monto)
+        val (fondo, letra) = when (d.estado) {
+            EstadoDia.PAGO -> verdeFondo to verde
+            EstadoDia.SIN_PAGO -> rojoFondo to rojo
+            EstadoDia.PRESTO -> ambarFondo to ambar
+            else -> null to gris
+        }
+        if (fondo != null) cv.drawRoundRect(r, 12f, 12f, relleno.apply { color = fondo }) else cv.drawRoundRect(r, 12f, 12f, borde)
+        cv.drawText("${d.fecha.dayOfMonth}", r.centerX(), y + 48f, pincel(32f, letra, alinear = centro))
+        when (d.estado) {
+            EstadoDia.PAGO -> cv.drawText(soles(d.monto).removePrefix("S/ "), r.centerX(), y + 100f, pincel(32f, letra, bold = true, alinear = centro))
+            EstadoDia.SIN_PAGO -> cv.drawText("✕", r.centerX(), y + 100f, pincel(30f, letra, bold = true, alinear = centro))
+            EstadoDia.PRESTO -> cv.drawText("Prestó", r.centerX(), y + 98f, pincel(22f, letra, alinear = centro))
+            else -> {}
         }
     }
 
-    val pie = inicioGrilla + filas * (alto + hueco) + 70f
-    cv.drawText("Pagó ${soles(libro.pagado(p))}", m, pie, pincel(46f, tinta, bold = true))
+    cv.drawText(resumenMes(dias), m, pie + 20f, pincel(34f, tinta))
+    cv.drawText("En total pagó ${soles(libro.pagado(p))}", m, pie + 110f, pincel(46f, tinta, bold = true))
     val falta = libro.falta(p)
     cv.drawText(
         if (falta > 0) "Le falta ${soles(falta)}" else "Terminó de pagar",
-        ancho - m, pie,
-        pincel(46f, if (falta > 0) rojo else verde, bold = true).apply { textAlign = Paint.Align.RIGHT },
+        ancho - m, pie + 110f,
+        pincel(46f, if (falta > 0) rojo else verde, bold = true, alinear = Paint.Align.RIGHT),
     )
-    cv.drawText("Al ${fechaCorta(ahora, 0)}", ancho / 2, pie + 90f, pincel(32f, gris, centro = true))
+    cv.drawText("Verde: pagó · Rojo: no pagó · Al ${fechaCorta(ahora, 0)}", ancho / 2, pie + 200f, pincel(30f, gris, alinear = centro))
     return bmp
 }
 
 /** Guarda la imagen y la abre en el chat del cliente en WhatsApp; si no se puede, deja elegir con qué enviarla. */
-fun enviarTarjeta(ctx: Context, libro: Libro, p: Prestamo, cliente: Cliente, ahora: Long) {
+fun enviarTarjeta(ctx: Context, libro: Libro, p: Prestamo, cliente: Cliente, ahora: Long, mes: YearMonth = mesesTarjeta(p, dia(ahora)).last()) {
     val carpeta = File(ctx.cacheDir, "tarjetas").apply { mkdirs() }
     val archivo = File(carpeta, "tarjeta.png")
-    archivo.outputStream().use { imagenTarjeta(ctx, libro, p, cliente, ahora).compress(Bitmap.CompressFormat.PNG, 100, it) }
+    archivo.outputStream().use { imagenTarjeta(ctx, libro, p, cliente, ahora, mes).compress(Bitmap.CompressFormat.PNG, 100, it) }
     val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.archivos", archivo)
     fun envio() = Intent(Intent.ACTION_SEND).apply {
         type = "image/png"

@@ -19,6 +19,10 @@ fun datosEjemplo(ahora: Long): DatosEjemplo {
     // prestamo = (prestó, paga, hace días) + pagos (monto, hace días)
     class P(val presto: Int, val paga: Int, val hace: Int, vararg val pagos: Pair<Int, Int>, val nota: String = "")
 
+    // Pagos de todos los días entre "desde" y "hasta" (hace días), menos los días que no pagó
+    fun diario(monto: Int, desde: Int, hasta: Int, noPago: Set<Int>) =
+        (desde downTo hasta).filter { it !in noPago }.map { monto to it }.toTypedArray()
+
     fun cliente(nombre: String, celular: String, dni: String, vararg ps: P) {
         val cid = id(dni)
         clientes += Cliente(cid, nombre, celular, dni, ahora - ps.maxOf { it.hace } * DIA, ahora)
@@ -33,14 +37,14 @@ fun datosEjemplo(ahora: Long): DatosEjemplo {
         }
     }
 
-    cliente("Rosa Huamán", "987112233", "45127893", P(500, 600, 40, 100 to 30, 80 to 22, nota = "Paga los sábados en el mercado"))
-    cliente("Julio Quispe", "956443210", "40981254", P(1000, 1200, 43, 200 to 35, 300 to 26, 200 to 8))
+    cliente("Rosa Huamán", "987112233", "45127893", P(500, 600, 40, *diario(10, 39, 22, setOf(36, 33, 29, 28, 25)), nota = "Paga los sábados en el mercado"))
+    cliente("Julio Quispe", "956443210", "40981254", P(1000, 1200, 43, *diario(20, 42, 8, setOf(39, 35, 34, 28, 21, 20, 14, 12))))
     cliente("Pedro Mamani", "912876540", "47823019", P(300, 360, 25))
-    cliente("Carmen Flores", "998223401", "42650987", P(200, 240, 12, 50 to 5))
-    cliente("Lucía Rojas", "934556712", "46209833", P(150, 180, 9, 30 to 2))
+    cliente("Carmen Flores", "998223401", "42650987", P(200, 240, 12, *diario(10, 11, 5, setOf(9))))
+    cliente("Lucía Rojas", "934556712", "46209833", P(150, 180, 9, *diario(5, 8, 2, setOf(5))))
     cliente("Teodoro Ccahuana", "965012347", "41378206", P(800, 960, 60, 160 to 50, 160 to 38))
     cliente("Gladys Paredes", "987650091", "43890125", P(400, 480, 3))
-    cliente("Wilmer Torres", "941238870", "48012376", P(250, 300, 18, 100 to 10, 60 to 1))
+    cliente("Wilmer Torres", "941238870", "48012376", P(250, 300, 18, *diario(10, 17, 1, setOf(15, 12, 11, 7, 4, 3))))
     cliente("Ana Sulca", "923871104", "44721350", P(300, 360, 120, 120 to 100, 120 to 80, 120 to 62))
     cliente(
         "Mario Inga", "978120035", "40216987",

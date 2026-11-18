@@ -6,7 +6,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import pe.reizo.prestamos.ui.casillasTarjeta
+import java.time.YearMonth
 import java.time.LocalDate
 import java.time.ZonedDateTime
 
@@ -89,8 +89,8 @@ class CoreTest {
     @Test fun `texto de estado`() {
         assertEquals("Sin pagos hace 22 días", libro.estado(id("Rosa"), ahora))
         assertEquals("Sin pagos desde que prestó (25 días)", libro.estado(id("Pedro"), ahora))
-        assertEquals("Pagó S/ 50 hace 5 días", libro.estado(id("Carmen"), ahora))
-        assertEquals("Pagó S/ 60 ayer", libro.estado(id("Wilmer"), ahora))
+        assertEquals("Pagó S/ 10 hace 5 días", libro.estado(id("Carmen"), ahora))
+        assertEquals("Pagó S/ 10 ayer", libro.estado(id("Wilmer"), ahora))
         assertEquals("Sin pagos aún · prestó hace 3 días", libro.estado(id("Gladys"), ahora))
     }
 
@@ -105,7 +105,7 @@ class CoreTest {
 
     @Test fun `filtro Deben mas ordena por deuda`() {
         assertEquals(
-            listOf("Teodoro", "Julio", "Gladys", "Rosa", "Pedro", "Carmen", "Lucía", "Wilmer"),
+            listOf("Julio", "Teodoro", "Gladys", "Rosa", "Pedro", "Wilmer", "Carmen", "Lucía"),
             nombres(libro.clientesActivos("", Filtro.DEBEN_MAS, ahora)),
         )
         assertEquals(64_000, libro.deuda(id("Teodoro")))
@@ -169,11 +169,11 @@ class CoreTest {
         val mes = libro.resumen(rangoDe(Periodo.MES, ahora))
         // Préstamos de noviembre: Carmen 200 (12), Lucía 150 (9), Gladys 400 (3)
         assertEquals(75_000, mes.presto)
-        // Pagos de noviembre: Julio 200 (8), Carmen 50 (5), Lucía 30 (2), Wilmer 100 (10) y 60 (1), Félix 300 (6)
-        assertEquals(74_000, mes.cobro)
+        // Pagos de noviembre (pagos diarios): Julio 4 × 20, Carmen 6 × 10, Lucía 6 × 5, Wilmer 7 × 10, Félix 300
+        assertEquals(54_000, mes.cobro)
         // Las listas del desglose suman lo mismo que la cifra y van de lo más reciente a lo más antiguo
         assertEquals(3, mes.prestados.size)
-        assertEquals(6, mes.cobrados.size)
+        assertEquals(24, mes.cobrados.size)
         assertEquals(mes.presto, mes.prestados.sumOf { it.montoPrestado })
         assertEquals(mes.cobro, mes.cobrados.sumOf { it.monto })
         assertEquals("Wilmer", primerNombre(libro.cliente(libro.prestamo(mes.cobrados.first().prestamoId)!!.clienteId)!!.nombre))
@@ -181,7 +181,7 @@ class CoreTest {
     }
 
     @Test fun `le deben hoy y ganara`() {
-        assertEquals(288_000, libro.leDebenHoy)
+        assertEquals(313_000, libro.leDebenHoy)
         assertEquals(72_000, libro.ganara)
     }
 
@@ -243,7 +243,7 @@ class CoreTest {
         assertEquals(listOf("Teodoro"), nombres(a30.clientesActivos("", Filtro.SIN_PAGAR, ahora)))
         assertEquals("Sin pagos hace 8 días", a7.estado(id("Julio"), ahora))
         assertEquals("Sin pagos hace 22 días", libro.estado(id("Rosa"), ahora))
-        assertEquals("Pagó S/ 80 hace 22 días", a30.estado(id("Rosa"), ahora))
+        assertEquals("Pagó S/ 10 hace 22 días", a30.estado(id("Rosa"), ahora))
     }
 
     @Test fun formato() {
@@ -262,10 +262,24 @@ class CoreTest {
     }
 
     @Test
-    fun casillasDeLaTarjeta() {
-        assertEquals(10, casillasTarjeta(0, termino = false))   // préstamo nuevo: dos filas vacías
-        assertEquals(10, casillasTarjeta(7, termino = false))
-        assertEquals(15, casillasTarjeta(10, termino = false))  // fila llena: abre otra
-        assertEquals(15, casillasTarjeta(12, termino = true))   // terminó: sin filas de más
+    fun calendarioDeLaTarjeta() {
+        val hoy = LocalDate.of(2026, 11, 18)
+        val p = Prestamo("p", "c", 50_000, 60_000, lima(2026, 10, 28), null, 0)
+        val pagos = listOf(
+            Pago("a", "p", 1_000, lima(2026, 11, 2), 0),
+            Pago("b", "p", 1_000, lima(2026, 11, 2), 0),   // dos pagos el mismo día se suman
+            Pago("c", "p", 2_000, lima(2026, 11, 3), 0),
+        )
+        assertEquals(listOf(YearMonth.of(2026, 10), YearMonth.of(2026, 11)), mesesTarjeta(p, hoy))
+        val oct = diasTarjeta(p, pagos, YearMonth.of(2026, 10), hoy)
+        assertEquals(EstadoDia.FUERA, oct[26].estado)
+        assertEquals(EstadoDia.PRESTO, oct[27].estado)
+        assertEquals(EstadoDia.SIN_PAGO, oct[28].estado)
+        val nov = diasTarjeta(p, pagos, YearMonth.of(2026, 11), hoy)
+        assertEquals(EstadoDia.SIN_PAGO, nov[0].estado)
+        assertEquals(DiaTarjeta(LocalDate.of(2026, 11, 2), EstadoDia.PAGO, 2_000), nov[1])
+        assertEquals(EstadoDia.HOY, nov[17].estado)
+        assertEquals(EstadoDia.FUTURO, nov[18].estado)
+        assertEquals(15, nov.count { it.estado == EstadoDia.SIN_PAGO })   // del 1 al 17, menos el 2 y el 3
     }
 }
