@@ -6,6 +6,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import pe.reizo.prestamos.ui.casillasTarjeta
 import java.time.LocalDate
 import java.time.ZonedDateTime
 
@@ -258,5 +259,13 @@ class CoreTest {
         assertEquals("12 set 2025", fechaCorta(lima(2025, 9, 12), ahora))
         assertEquals("987 112 233", celularBonito("987112233"))
         assertEquals("420.50", montoParaCampo(42_050))
+    }
+
+    @Test
+    fun casillasDeLaTarjeta() {
+        assertEquals(10, casillasTarjeta(0, termino = false))   // préstamo nuevo: dos filas vacías
+        assertEquals(10, casillasTarjeta(7, termino = false))
+        assertEquals(15, casillasTarjeta(10, termino = false))  // fila llena: abre otra
+        assertEquals(15, casillasTarjeta(12, termino = true))   // terminó: sin filas de más
     }
 }

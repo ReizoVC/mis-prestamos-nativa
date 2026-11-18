@@ -40,6 +40,7 @@ sealed interface Pantalla {
     data class Ficha(val clienteId: String) : Pantalla
     data class Nuevo(val clienteId: String?) : Pantalla
     data class Desglose(val tipo: TipoDesglose) : Pantalla
+    data class Cobranza(val prestamoId: String) : Pantalla
     data object Ajustes : Pantalla
     data object Papelera : Pantalla
 }

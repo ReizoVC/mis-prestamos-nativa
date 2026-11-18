@@ -80,6 +80,7 @@ La especificación se tomó como guía. Lo que se decidió distinto y por qué:
 | Montos | Número con decimales | Céntimos enteros en la base; se convierten a soles al exportar o sincronizar |
 | Actualizaciones | Aviso "Hay una versión nueva" | Igual: la app revisa GitHub Releases, muestra el aviso y descarga el APK nuevo |
 | Eliminar cliente | No existía | En el menú "Más" de la ficha, con confirmación y "Deshacer". Se recupera desde Ajustes > Clientes eliminados |
+| Tarjeta de cobranza | No existía (la usuaria usaba una de papel) | "Ver tarjeta" en cada préstamo: una casilla por pago, sin número fijo de días. El botón WhatsApp ofrece mandar el mensaje o la foto de la tarjeta |
 | Respaldo | Solo guardar | Guardar y también **recuperar** un respaldo. El archivo tiene el mismo formato que el de la versión web, así que sirve para pasar los datos de una a otra. |
 | Copia automática | No | Además, Android incluye los datos en la copia de seguridad de Google del celular |
 

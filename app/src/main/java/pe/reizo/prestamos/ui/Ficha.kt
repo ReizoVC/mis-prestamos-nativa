@@ -17,6 +17,8 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -66,6 +68,12 @@ private fun abrirEnlace(ctx: Context, accion: String, enlace: String) {
     runCatching { ctx.startActivity(Intent(accion, Uri.parse(enlace))) }
 }
 
+/** Abre el chat con el mensaje ya escrito; ella decide si lo envía o lo cambia. */
+private fun abrirWhatsapp(ctx: Context, cliente: Cliente, libro: Libro) {
+    val texto = Uri.encode(mensajeWhatsapp(cliente.nombre, libro.deuda(cliente.id)))
+    abrirEnlace(ctx, Intent.ACTION_VIEW, "https://wa.me/51${cliente.celular}?text=$texto")
+}
+
 @Composable
 fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState) {
     val cliente = libro.cliente(clienteId)
@@ -77,6 +85,7 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
     var eliminando by remember { mutableStateOf(false) }
     var editando by remember { mutableStateOf(false) }
     var notaDe by remember { mutableStateOf<Prestamo?>(null) }
+    var eligiendoEnvio by remember { mutableStateOf(false) }
     val ambito = rememberCoroutineScope()
 
     var menuAbierto by remember { mutableStateOf(false) }
@@ -167,9 +176,8 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
                     }
                     FilledTonalButton(
                         onClick = {
-                            // Abre el chat con el mensaje ya escrito; ella decide si lo envía o lo cambia
-                            val texto = Uri.encode(mensajeWhatsapp(cliente.nombre, libro.deuda(clienteId)))
-                            abrirEnlace(ctx, Intent.ACTION_VIEW, "https://wa.me/51${cliente.celular}?text=$texto")
+                            // Si debe, pregunta si manda el mensaje o la foto de la tarjeta
+                            if (activos.isEmpty()) abrirWhatsapp(ctx, cliente, libro) else eligiendoEnvio = true
                         },
                         modifier = Modifier.weight(1f).heightIn(min = ALTO_BOTON),
                     ) {
@@ -186,6 +194,7 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
                         alPagar = { pagoPara = p },
                         alTocarPago = { pagoElegido = it },
                         alTocarNota = { notaDe = p },
+                        alVerTarjeta = { vm.abrir(Pantalla.Cobranza(p.id)) },
                     )
                 }
 
@@ -199,6 +208,36 @@ fun Ficha(vm: AppVM, libro: Libro, clienteId: String, avisos: SnackbarHostState)
                     modifier = Modifier.fillMaxWidth().heightIn(min = ALTO_BOTON),
                 ) { Text("Nuevo préstamo para ${primerNombre(cliente.nombre)}") }
             }
+        }
+    }
+
+    // ---- WhatsApp: mensaje o foto de la tarjeta
+    if (eligiendoEnvio && cliente != null) {
+        val activos = libro.activosDe(clienteId)
+        ModalBottomSheet(onDismissRequest = { eligiendoEnvio = false }) {
+            Text(
+                "¿Qué le manda a ${primerNombre(cliente.nombre)}?",
+                Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            val transparente = ListItemDefaults.colors(containerColor = Color.Transparent)
+            ListItem(
+                headlineContent = { Text("Mensaje con lo que debe", style = MaterialTheme.typography.bodyLarge) },
+                leadingContent = { Icon(Icons.AutoMirrored.Filled.Chat, null) },
+                colors = transparente,
+                modifier = Modifier.clickable { eligiendoEnvio = false; abrirWhatsapp(ctx, cliente, libro) }.heightIn(min = 64.dp).padding(horizontal = 8.dp),
+            )
+            activos.forEach { p ->
+                ListItem(
+                    headlineContent = { Text("Foto de la tarjeta", style = MaterialTheme.typography.bodyLarge) },
+                    supportingContent = if (activos.size > 1) ({ Text("Préstamo del ${fechaCorta(p.creadoEn, vm.ahora)}") }) else null,
+                    leadingContent = { Icon(Icons.Default.Image, null) },
+                    colors = transparente,
+                    modifier = Modifier.clickable { eligiendoEnvio = false; enviarTarjeta(ctx, libro, p, cliente, vm.ahora) }
+                        .heightIn(min = 64.dp).padding(horizontal = 8.dp),
+                )
+            }
+            Spacer(Modifier.height(16.dp))
         }
     }
 
@@ -366,6 +405,7 @@ private fun PrestamoActivo(
     alPagar: () -> Unit,
     alTocarPago: (Pago) -> Unit,
     alTocarNota: () -> Unit,
+    alVerTarjeta: () -> Unit,
 ) {
     val pagado = libro.pagado(p)
     val pagos = libro.pagosDe(p.id)
@@ -407,6 +447,18 @@ private fun PrestamoActivo(
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (p.nota.isBlank()) c.primary else c.onSurface,
                 )
+            }
+            HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = c.surfaceContainerHigh)
+            // La misma tarjeta de papel que ella usa, armada con los pagos
+            Row(
+                Modifier.fillMaxWidth().clickable(onClickLabel = "Ver tarjeta", onClick = alVerTarjeta)
+                    .heightIn(min = ALTO_BOTON).padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Icon(Icons.Default.GridView, null, tint = c.primary)
+                Text("Ver tarjeta", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = c.primary)
+                Text(if (pagos.size == 1) "1 pago" else "${pagos.size} pagos", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
             }
         }
 

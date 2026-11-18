@@ -34,8 +34,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // Para publicar: subir los dos. versionCode siempre aumenta de uno en uno.
-        versionCode = (findProperty("vc") as String?)?.toInt() ?: 6
-        versionName = (findProperty("vn") as String?) ?: "1.0.5"
+        versionCode = (findProperty("vc") as String?)?.toInt() ?: 7
+        versionName = (findProperty("vn") as String?) ?: "1.0.6"
         buildConfigField("String", "ACTUALIZACIONES_URL", "\"$fuenteActualizaciones\"")
         manifestPlaceholders["textoClaro"] = (fuentePrueba != null).toString()
         // MODO DESARROLLO: mientras sea true la app NO guarda nada. Los datos viven en memoria,
